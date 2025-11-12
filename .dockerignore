@@ -1,0 +1,89 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Credentials and sensitive data
+.env
+config/config.yaml
+*.pem
+*.key
+
+# Data files (will be mounted as volumes)
+fidelity_data_*.json
+fidelity_accounts_*.csv
+fidelity_holdings_*.csv
+*.db
+*.db-journal
+data/
+
+# Logs (will be mounted as volumes)
+logs/
+*.log
+
+# Browser automation
+Fidelity.json
+*.crx
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+tests/
+
+# Documentation
+docs/_build/
+*.md
+!README.md
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# CI/CD
+.github/
+
+# Temporary files
+*.tmp
+.cache/
+scheduler_state.json
+
+# Backup files
+backup*/

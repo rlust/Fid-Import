@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  # Main application service
+  portfolio-tracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fidelity-portfolio-tracker
+    env_file:
+      - .env
+    environment:
+      - FIDELITY_USERNAME=${FIDELITY_USERNAME}
+      - FIDELITY_PASSWORD=${FIDELITY_PASSWORD}
+      - FIDELITY_MFA_SECRET=${FIDELITY_MFA_SECRET}
+    volumes:
+      # Mount config directory
+      - ./config:/app/config:ro
+      # Mount data directory for persistence
+      - ./data:/app/data
+      # Mount logs directory
+      - ./logs:/app/logs
+      # Mount database
+      - ./fidelity_portfolio.db:/app/fidelity_portfolio.db
+    ports:
+      - "8501:8501"  # Streamlit dashboard
+      - "8000:8000"  # REST API
+    restart: unless-stopped
+    command: portfolio-tracker sync
+    networks:
+      - portfolio-network
+
+  # Web dashboard service (optional, runs separately)
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fidelity-dashboard
+    depends_on:
+      - portfolio-tracker
+    volumes:
+      - ./data:/app/data:ro
+      - ./fidelity_portfolio.db:/app/fidelity_portfolio.db:ro
+      - ./config:/app/config:ro
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
+    command: portfolio-tracker dashboard
+    networks:
+      - portfolio-network
+
+  # API service for mobile integration
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fidelity-api
+    depends_on:
+      - portfolio-tracker
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data:ro
+      - ./fidelity_portfolio.db:/app/fidelity_portfolio.db:ro
+      - ./config:/app/config:ro
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    command: python -m fidelity_tracker.api.server
+    networks:
+      - portfolio-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Scheduler service (runs automated syncs)
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fidelity-scheduler
+    env_file:
+      - .env
+    environment:
+      - FIDELITY_USERNAME=${FIDELITY_USERNAME}
+      - FIDELITY_PASSWORD=${FIDELITY_PASSWORD}
+      - FIDELITY_MFA_SECRET=${FIDELITY_MFA_SECRET}
+    volumes:
+      - ./config:/app/config:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./fidelity_portfolio.db:/app/fidelity_portfolio.db
+    restart: unless-stopped
+    command: python -m fidelity_tracker.scheduler.daemon
+    networks:
+      - portfolio-network
+
+networks:
+  portfolio-network:
+    driver: bridge
+
+volumes:
+  portfolio-data:
+  portfolio-logs:

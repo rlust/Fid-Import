@@ -1,0 +1,34 @@
+# Include documentation
+include README.md
+include README_V2.md
+include MIGRATION_GUIDE.md
+include LICENSE
+include CHANGELOG.md
+
+# Include configuration examples
+include config/config.yaml.example
+
+# Include tests
+recursive-include tests *.py
+
+# Include type hints
+include fidelity_tracker/py.typed
+
+# Exclude unnecessary files
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude .DS_Store
+global-exclude *.so
+global-exclude .git*
+
+# Exclude data and logs
+prune data
+prune logs
+prune htmlcov
+prune .pytest_cache
+
+# Exclude environment and IDE files
+exclude .env
+exclude .env.example
+prune .vscode
+prune .idea
