@@ -40,6 +40,15 @@ def get_db():
     return DatabaseManager(db_path)
 
 
+def map_holding_fields(holding: Dict[str, Any]) -> Dict[str, Any]:
+    """Map database fields to API response fields"""
+    mapped = holding.copy()
+    # Map ticker to symbol for API consistency
+    if 'ticker' in mapped:
+        mapped['symbol'] = mapped.pop('ticker')
+    return mapped
+
+
 # Pydantic models
 class SnapshotResponse(BaseModel):
     id: int
@@ -93,6 +102,8 @@ async def get_portfolio_summary(db: DatabaseManager = Depends(get_db)):
 
     holdings = db.get_holdings(latest['id'])
 
+    # Note: gain_loss and cost_basis are not stored in current schema
+    # These would need to be calculated from historical data or added to schema
     total_gain_loss = sum(h.get('gain_loss', 0) for h in holdings if h.get('gain_loss'))
     total_cost = sum(h.get('cost_basis', 0) for h in holdings if h.get('cost_basis'))
     total_return_percent = (total_gain_loss / total_cost * 100) if total_cost > 0 else None
@@ -100,7 +111,7 @@ async def get_portfolio_summary(db: DatabaseManager = Depends(get_db)):
     return PortfolioSummary(
         total_value=latest['total_value'],
         total_holdings=len(holdings),
-        total_gain_loss=total_gain_loss,
+        total_gain_loss=total_gain_loss if total_gain_loss > 0 else None,
         total_return_percent=total_return_percent,
         last_updated=latest['timestamp']
     )
@@ -122,7 +133,7 @@ async def get_holdings(
     if limit:
         holdings = holdings[:limit]
 
-    return [HoldingResponse(**h) for h in holdings]
+    return [HoldingResponse(**map_holding_fields(h)) for h in holdings]
 
 
 @app.get("/api/v1/portfolio/sectors", response_model=List[SectorAllocation])
@@ -169,7 +180,7 @@ async def get_top_holdings(
     holdings = db.get_holdings(latest['id'])
     top_holdings = sorted(holdings, key=lambda h: h.get('value', 0), reverse=True)[:limit]
 
-    return [HoldingResponse(**h) for h in top_holdings]
+    return [HoldingResponse(**map_holding_fields(h)) for h in top_holdings]
 
 
 @app.get("/api/v1/snapshots", response_model=List[SnapshotResponse])
@@ -214,7 +225,7 @@ async def get_snapshot_holdings(
     if not holdings:
         raise HTTPException(status_code=404, detail=f"No holdings found for snapshot {snapshot_id}")
 
-    return [HoldingResponse(**h) for h in holdings]
+    return [HoldingResponse(**map_holding_fields(h)) for h in holdings]
 
 
 @app.get("/api/v1/portfolio/history")

@@ -189,16 +189,17 @@ def main():
     with tab1:
         st.subheader("Top Holdings")
 
-        # Sort by value
-        top_holdings = df.nlargest(10, 'value')[['symbol', 'company_name', 'value', 'portfolio_weight', 'gain_loss_percent']]
+        # Sort by value - use available columns
+        cols_to_display = ['ticker', 'company_name', 'value', 'portfolio_weight']
+        top_holdings = df.nlargest(10, 'value')[cols_to_display]
 
         # Create bar chart
         fig = px.bar(
             top_holdings,
-            x='symbol',
+            x='ticker',
             y='value',
             title='Top 10 Holdings by Value',
-            labels={'value': 'Value ($)', 'symbol': 'Symbol'},
+            labels={'value': 'Value ($)', 'ticker': 'Ticker'},
             text='value',
             color='value',
             color_continuous_scale='Viridis'
@@ -216,17 +217,17 @@ def main():
             # Pie chart by holdings
             st.markdown("**By Holdings**")
             top_10 = df.nlargest(10, 'value')
-            others_value = df[~df['symbol'].isin(top_10['symbol'])]['value'].sum()
+            others_value = df[~df['ticker'].isin(top_10['ticker'])]['value'].sum()
 
             pie_data = pd.concat([
-                top_10[['symbol', 'value']],
-                pd.DataFrame([{'symbol': 'Others', 'value': others_value}])
+                top_10[['ticker', 'value']],
+                pd.DataFrame([{'ticker': 'Others', 'value': others_value}])
             ])
 
             fig_pie = px.pie(
                 pie_data,
                 values='value',
-                names='symbol',
+                names='ticker',
                 title='Top 10 Holdings + Others',
                 hole=0.4
             )
@@ -329,12 +330,12 @@ def main():
         if show_all:
             display_df = df
         else:
-            # Show most relevant columns
-            cols = ['symbol', 'company_name', 'quantity', 'last_price', 'value', 'portfolio_weight']
-            if 'gain_loss' in df.columns:
-                cols.extend(['cost_basis', 'gain_loss', 'gain_loss_percent'])
+            # Show most relevant columns - use actual column names from database
+            cols = ['ticker', 'company_name', 'quantity', 'last_price', 'value', 'portfolio_weight']
             if 'sector' in df.columns:
                 cols.append('sector')
+            if 'industry' in df.columns:
+                cols.append('industry')
 
             display_df = df[[col for col in cols if col in df.columns]]
 

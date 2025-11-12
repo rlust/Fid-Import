@@ -346,7 +346,7 @@ def status(ctx, limit, detailed):
             console.print(f"\n[bold]Top 5 Holdings[/bold]")
             for i, holding in enumerate(holdings[:5], 1):
                 console.print(
-                    f"  {i}. {holding.get('symbol', 'N/A'):6s} "
+                    f"  {i}. {holding.get('ticker', 'N/A'):6s} "
                     f"${holding.get('value', 0):>12,.2f}  "
                     f"({holding.get('portfolio_weight', 0):>5.2f}%)"
                 )
