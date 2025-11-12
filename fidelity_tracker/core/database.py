@@ -221,7 +221,10 @@ class DatabaseManager:
 
         try:
             if snapshot_id is None:
-                snapshot_id = self.get_latest_snapshot()['id']
+                latest = self.get_latest_snapshot()
+                if latest is None:
+                    return []
+                snapshot_id = latest['id']
 
             cursor.execute(
                 'SELECT * FROM holdings WHERE snapshot_id = ? ORDER BY value DESC',

@@ -17,6 +17,7 @@ from fidelity_tracker.core.database import DatabaseManager
 from fidelity_tracker.core.storage import StorageManager
 from fidelity_tracker.utils.config import Config
 from fidelity_tracker.utils.logger import setup_logging
+import fidelity_tracker
 
 console = Console()
 
@@ -24,6 +25,7 @@ console = Console()
 @click.group()
 @click.option('--config', '-c', type=click.Path(), help='Path to config file')
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
+@click.version_option(version=fidelity_tracker.__version__, prog_name='portfolio-tracker')
 @click.pass_context
 def cli(ctx, config, verbose):
     """Fidelity Portfolio Tracker - Automated portfolio data collection and analysis"""
@@ -284,11 +286,34 @@ def cleanup(ctx, days, files, database):
 @click.pass_context
 def dashboard(ctx):
     """Launch web dashboard"""
+    import subprocess
+    import shutil
+
+    # Check if streamlit is installed
+    if not shutil.which('streamlit'):
+        console.print("[red]Error: Streamlit is not installed.[/red]")
+        console.print("Install with: [bold]pip install streamlit[/bold]")
+        raise click.Abort()
+
+    # Check if web app exists
+    web_app_path = Path('web/app.py')
+    if not web_app_path.exists():
+        console.print("[yellow]Warning: Web dashboard is not yet implemented.[/yellow]")
+        console.print("This feature is coming soon in a future release.")
+        console.print("\nFor now, you can:")
+        console.print("  • Use [bold]portfolio-tracker status[/bold] to view your portfolio")
+        console.print("  • Open CSV files in Excel/Google Sheets for analysis")
+        console.print("  • Query the SQLite database directly")
+        raise click.Abort()
+
     console.print("[bold blue]Launching web dashboard...[/bold blue]")
     console.print("Dashboard will open in your browser at http://localhost:8501")
 
-    import subprocess
-    subprocess.run(['streamlit', 'run', 'web/app.py'])
+    try:
+        subprocess.run(['streamlit', 'run', str(web_app_path)], check=True)
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]Failed to launch dashboard: {e}[/red]")
+        raise click.Abort()
 
 
 if __name__ == '__main__':

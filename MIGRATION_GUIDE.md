@@ -109,9 +109,9 @@ portfolio-tracker enrich backup_v1/fidelity_data_LATEST.json
 
 **Old (.env):**
 ```env
-FIDELITY_USERNAME=587888
-FIDELITY_PASSWORD=Rc514131!!
-FIDELITY_MFA_SECRET=J3D5MFLR4DTASFIVAN4HN5ZC66MAKKOH
+FIDELITY_USERNAME=your_username
+FIDELITY_PASSWORD=your_password
+FIDELITY_MFA_SECRET=YOUR_TOTP_SECRET_KEY
 ```
 
 **New (config.yaml):**

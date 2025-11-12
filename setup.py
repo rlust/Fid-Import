@@ -18,8 +18,8 @@ setup(
     long_description=read_file('README.md'),
     long_description_content_type='text/markdown',
     author='Randy Lust',
-    author_email='your_email@example.com',
-    url='https://github.com/yourusername/fidelity-portfolio-tracker',
+    author_email='rlust@example.com',
+    url='https://github.com/rlust/Fid-Import',
     license='MIT',
 
     packages=find_packages(exclude=['tests', 'tests.*']),
