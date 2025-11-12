@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roth Conversion Optimizer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+        }
+        .inputs {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: right;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Roth Conversion Optimizer</h1>
+        <div class="inputs">
+            <label>Current Age: <input type="number" id="currentAge" value="60"></label>
+            <label>Retirement Age: <input type="number" id="retirementAge" value="65"></label>
+            <label>RMD Age: <input type="number" id="rmdAge" value="73"></label>
+            <label>Starting IRA Balance ($): <input type="number" id="iraBalance" value="500000"></label>
+            <label>Annual Income ($): <input type="number" id="annualIncome" value="40000"></label>
+            <label>IRA Growth Rate (%): <input type="number" id="growthRate" value="5" step="0.1"></label>
+            <label>Filing Status: 
+                <select id="filingStatus">
+                    <option value="single">Single</option>
+                    <option value="married">Married</option>
+                </select>
+            </label>
+            <button onclick="calculateConversions()">Calculate</button>
+        </div>
+        <table id="results">
+            <thead>
+                <tr>
+                    <th>Year</th>
+                    <th>IRA Balance</th>
+                    <th>Annual Income</th>
+                    <th>Taxable Income Before</th>
+                    <th>Conversion Amount</th>
+                    <th>Taxable Income After</th>
+                    <th>Marginal Tax Rate</th>
+                    <th>Tax Cost</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    <script>
+        const taxBrackets = {
+            single: [
+                { min: 0, max: 12000, rate: 0.10 },
+                { min: 12001, max: 48000, rate: 0.12 },
+                { min: 48001, max: 100000, rate: 0.22 },
+                { min: 100001, max: Infinity, rate: 0.24 }
+            ],
+            married: [
+                { min: 0, max: 24000, rate: 0.10 },
+                { min: 24001, max: 96000, rate: 0.12 },
+                { min: 96001, max: 200000, rate: 0.22 },
+                { min: 200001, max: Infinity, rate: 0.24 }
+            ]
+        };
+
+        function getMarginalRate(income, status) {
+            const brackets = taxBrackets[status];
+            for (let bracket of brackets) {
+                if (income >= bracket.min && income <= bracket.max) return bracket.rate;
+            }
+            return 0.24; // Default to highest rate if out of range
+        }
+
+        function calculateConversions() {
+            const currentAge = parseInt(document.getElementById('currentAge').value);
+            const rmdAge = parseInt(document.getElementById('rmdAge').value);
+            const iraBalance = parseFloat(document.getElementById('iraBalance').value);
+            const annualIncome = parseFloat(document.getElementById('annualIncome').value);
+            const growthRate = parseFloat(document.getElementById('growthRate').value) / 100;
+            const filingStatus = document.getElementById('filingStatus').value;
+
+            let year = 2025;
+            let balance = iraBalance;
+            const results = [];
+            const targetBracketMax = filingStatus === 'single' ? 48000 : 96000; // 12% bracket ceiling
+
+            for (let age = currentAge; age < rmdAge; age++) {
+                const taxableBefore = annualIncome;
+                const conversionAmount = Math.min(targetBracketMax - taxableBefore, balance);
+                const taxableAfter = taxableBefore + conversionAmount;
+                const marginalRate = getMarginalRate(taxableAfter, filingStatus);
+                const taxCost = conversionAmount * marginalRate;
+
+                results.push({
+                    year,
+                    balance: balance.toFixed(2),
+                    annualIncome: annualIncome.toFixed(2),
+                    taxableBefore: taxableBefore.toFixed(2),
+                    conversionAmount: conversionAmount.toFixed(2),
+                    taxableAfter: taxableAfter.toFixed(2),
+                    marginalRate: (marginalRate * 100).toFixed(1) + '%',
+                    taxCost: taxCost.toFixed(2)
+                });
+
+                balance = (balance - conversionAmount) * (1 + growthRate);
+                year++;
+            }
+
+            const tbody = document.querySelector('#results tbody');
+            tbody.innerHTML = '';
+            results.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.year}</td>
+                    <td>${row.balance}</td>
+                    <td>${row.annualIncome}</td>
+                    <td>${row.taxableBefore}</td>
+                    <td>${row.conversionAmount}</td>
+                    <td>${row.taxableAfter}</td>
+                    <td>${row.marginalRate}</td>
+                    <td>${row.taxCost}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', calculateConversions);
+    </script>
+</body>
+</html>

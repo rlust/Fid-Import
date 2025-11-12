@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Credentials and sensitive data
+.env
+config/config.yaml
+*.pem
+*.key
+
+# Data files
+fidelity_data_*.json
+fidelity_accounts_*.csv
+fidelity_holdings_*.csv
+*.db
+*.db-journal
+
+# Logs
+logs/
+*.log
+
+# Browser automation
+Fidelity.json
+*.crx
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation
+docs/_build/
+
+# Temporary files
+*.tmp
+.cache/

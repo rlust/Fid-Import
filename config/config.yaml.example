@@ -1,0 +1,68 @@
+# Fidelity Portfolio Tracker Configuration
+# Copy this file to config/config.yaml and update with your credentials
+
+credentials:
+  fidelity:
+    # You can use environment variables: ${FIDELITY_USERNAME}
+    # Or set the values directly (not recommended for security)
+    username: ${FIDELITY_USERNAME}
+    password: ${FIDELITY_PASSWORD}
+    mfa_secret: ${FIDELITY_MFA_SECRET}
+
+sync:
+  # Cron schedule for automatic sync (format: minute hour day month weekday)
+  # Examples:
+  #   "0 18 * * *"     - Daily at 6 PM
+  #   "0 9,18 * * *"   - Daily at 9 AM and 6 PM
+  #   "0 18 * * 1-5"   - Weekdays at 6 PM
+  schedule: "0 18 * * *"
+
+  # Cron schedule for enrichment (less frequent due to API rate limits)
+  enrichment_schedule: "0 19 * * 0"  # Weekly on Sunday at 7 PM
+
+  # Run browser in headless mode
+  headless: true
+
+enrichment:
+  # Enable Yahoo Finance data enrichment
+  enabled: true
+
+  # Delay between API calls (seconds) to avoid rate limiting
+  # Recommended: 3-5 seconds
+  delay_seconds: 3.0
+
+  # Maximum retries for failed API calls
+  max_retries: 3
+
+storage:
+  # Directory for output files (JSON, CSV)
+  output_dir: "."
+
+  # Number of days to keep old data files
+  retention_days: 90
+
+  # Automatically clean up old files
+  auto_cleanup: true
+
+  # Output formats to generate
+  formats:
+    - json
+    - csv
+    - sqlite
+
+database:
+  # Path to SQLite database file
+  path: "fidelity_portfolio.db"
+
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: "INFO"
+
+  # Log file path
+  file: "logs/portfolio-tracker.log"
+
+  # Rotate log files when they reach this size
+  rotation: "10 MB"
+
+  # Keep log files for this duration
+  retention: "30 days"

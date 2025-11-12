@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roth Conversion Optimizer</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background-color: #e6f2ff;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .inputs {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: right;
+        }
+        th {
+            background-color: #336699;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Roth Conversion Optimizer</h1>
+        <div class="inputs">
+            <label>Current Age: <input type="number" id="currentAge" value="60"></label>
+            <label>Retirement Age: <input type="number" id="retirementAge" value="65"></label>
+            <label>RMD Age: <input type="number" id="rmdAge" value="73"></label>
+            <label>Starting IRA Balance ($): <input type="number" id="iraBalance" value="500000"></label>
+            <label>Annual Income ($): <input type="number" id="annualIncome" value="40000"></label>
+            <label>IRA Growth Rate (%): <input type="number" id="growthRate" value="5" step="0.1"></label>
+            <label>Filing Status: 
+                <select id="filingStatus">
+                    <option value="single">Single</option>
+                    <option value="married">Married</option>
+                </select>
+            </label>
+            <label>Target Tax Rate for Conversions: 
+                <select id="targetRate">
+                    <option value="0.10">10%</option>
+                    <option value="0.12">12%</option>
+                    <option value="0.22">22%</option>
+                    <option value="0.24">24%</option>
+                </select>
+            </label>
+            <button onclick="calculateConversions()">Calculate</button>
+            <button onclick="generateSpreadsheet()">Download Spreadsheet</button>
+        </div>
+        <table id="results">
+            <thead>
+                <tr>
+                    <th>Year</th>
+                    <th>IRA Balance</th>
+                    <th>Annual Income</th>
+                    <th>RMD</th>
+                    <th>Conversion Amount</th>
+                    <th>Total Taxable Income</th>
+                    <th>Marginal Tax Rate</th>
+                    <th>Tax Cost of Conversion</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    <script>
+        // Tax brackets for single and married filing statuses
+        const taxBrackets = {
+            single: [
+                { min: 0, max: 12000, rate: 0.10 },
+                { min: 12001, max: 48000, rate: 0.12 },
+                { min: 48001, max: 100000, rate: 0.22 },
+                { min: 100001, max: Infinity, rate: 0.24 }
+            ],
+            married: [
+                { min: 0, max: 24000, rate: 0.10 },
+                { min: 24001, max: 96000, rate: 0.12 },
+                { min: 96001, max: 200000, rate: 0.22 },
+                { min: 200001, max: Infinity, rate: 0.24 }
+            ]
+        };
+
+        // Life expectancy table for RMD calculations
+        const lifeExpectancy = {
+            73: 26.5, 74: 25.5, 75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0, 79: 21.1, 80: 20.2,
+            81: 19.4, 82: 18.5, 83: 17.7, 84: 16.8, 85: 16.0, 86: 15.2, 87: 14.4, 88: 13.7,
+            89: 12.9, 90: 12.2
+        };
+
+        // Get marginal tax rate based on taxable income and filing status
+        function getMarginalRate(income, status) {
+            const brackets = taxBrackets[status];
+            for (let bracket of brackets) {
+                if (income >= bracket.min && income <= bracket.max) return bracket.rate;
+            }
+            return 0.24; // Default to highest rate if out of range
+        }
+
+        // Get upper limit of the target tax bracket
+        function getUpperLimit(rate, status) {
+            const brackets = taxBrackets[status];
+            for (let bracket of brackets) {
+                if (bracket.rate === rate) return bracket.max;
+            }
+            return Infinity; // If rate not found
+        }
+
+        // Calculate conversions and update table
+        function calculateConversions() {
+            const currentAge = parseInt(document.getElementById('currentAge').value);
+            const rmdAge = parseInt(document.getElementById('rmdAge').value);
+            const iraBalance = parseFloat(document.getElementById('iraBalance').value);
+            const annualIncome = parseFloat(document.getElementById('annualIncome').value);
+            const growthRate = parseFloat(document.getElementById('growthRate').value) / 100;
+            const filingStatus = document.getElementById('filingStatus').value;
+            const targetRate = parseFloat(document.getElementById('targetRate').value);
+
+            let year = 2025;
+            let balance = iraBalance;
+            const results = [];
+            const maxAge = 90; // Project until age 90
+
+            for (let age = currentAge; age <= maxAge; age++) {
+                let rmd = 0;
+                if (age >= rmdAge && lifeExpectancy[age]) {
+                    rmd = balance / lifeExpectancy[age];
+                }
+                const taxableBefore = annualIncome + rmd;
+                let conversionAmount = 0;
+                if (age < rmdAge) {
+                    const upperLimit = getUpperLimit(targetRate, filingStatus);
+                    conversionAmount = Math.min(balance, Math.max(0, upperLimit - taxableBefore));
+                }
+                const taxableAfter = taxableBefore + conversionAmount;
+                const marginalRate = getMarginalRate(taxableAfter, filingStatus);
+                const taxCost = conversionAmount * marginalRate;
+
+                // Update balance for next year
+                const withdrawal = conversionAmount + rmd;
+                balance = (balance - withdrawal) * (1 + growthRate);
+
+                results.push({
+                    year: year,
+                    balance: balance,
+                    annualIncome: annualIncome,
+                    rmd: rmd,
+                    conversionAmount: conversionAmount,
+                    taxableAfter: taxableAfter,
+                    marginalRate: marginalRate,
+                    taxCost: taxCost
+                });
+
+                year++;
+            }
+
+            window.conversionResults = results; // Store results for spreadsheet
+
+            const tbody = document.querySelector('#results tbody');
+            tbody.innerHTML = '';
+            results.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.year}</td>
+                    <td>${row.balance.toFixed(2)}</td>
+                    <td>${row.annualIncome.toFixed(2)}</td>
+                    <td>${row.rmd.toFixed(2)}</td>
+                    <td>${row.conversionAmount.toFixed(2)}</td>
+                    <td>${row.taxableAfter.toFixed(2)}</td>
+                    <td>${(row.marginalRate * 100).toFixed(1)}%</td>
+                    <td>${row.taxCost.toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Generate and download spreadsheet
+        function generateSpreadsheet() {
+            if (!window.conversionResults) {
+                alert("Please calculate the conversions first.");
+                return;
+            }
+
+            const headers = [
+                "Year", "IRA Balance", "Annual Income", "RMD", "Conversion Amount",
+                "Total Taxable Income", "Marginal Tax Rate", "Tax Cost of Conversion"
+            ];
+
+            const data = window.conversionResults.map(row => [
+                row.year,
+                row.balance,
+                row.annualIncome,
+                row.rmd,
+                row.conversionAmount,
+                row.taxableAfter,
+                row.marginalRate,
+                row.taxCost
+            ]);
+
+            // Calculate totals for conversion amount and tax cost
+            const totalConverted = window.conversionResults.reduce((sum, row) => sum + row.conversionAmount, 0);
+            const totalTaxPaid = window.conversionResults.reduce((sum, row) => sum + row.taxCost, 0);
+            const totalRow = ["Total", "", "", "", totalConverted.toFixed(2), "", "", totalTaxPaid.toFixed(2)];
+
+            // Add total row to data
+            data.push(totalRow);
+
+            // Create workbook and worksheet
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+            XLSX.utils.book_append_sheet(wb, ws, "Conversions");
+
+            // Generate and download Excel file
+            XLSX.writeFile(wb, "Roth_Conversion_Optimizer.xlsx");
+        }
+
+        // Initialize with a default calculation
+        document.addEventListener('DOMContentLoaded', calculateConversions);
+    </script>
+</body>
+</html>
