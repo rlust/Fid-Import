@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from loguru import logger
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fidelity_tracker.core.collector import PortfolioCollector
@@ -550,21 +550,25 @@ def export(ctx, output_file, snapshot_id, days, format):
 
         snapshots_to_export = [{'id': snapshot_id, 'holdings': holdings}]
     else:
-        # Export from date range
-        history = db.get_portfolio_history(days)
-        if not history:
-            console.print("[yellow]No snapshots found in the specified date range.[/yellow]")
+        # Export from date range - get full snapshots, not just history tuples
+        all_snapshots = db.get_snapshots(1000)  # Get many snapshots
+        if not all_snapshots:
+            console.print("[yellow]No snapshots found.[/yellow]")
             return
 
+        # Filter by date range
+        cutoff_date = datetime.now() - timedelta(days=days)
         snapshots_to_export = []
-        for snap in history:
-            holdings = db.get_holdings(snap['id'])
-            snapshots_to_export.append({
-                'id': snap['id'],
-                'timestamp': snap['timestamp'],
-                'total_value': snap['total_value'],
-                'holdings': holdings
-            })
+        for snap in all_snapshots:
+            snap_date = datetime.fromisoformat(snap['timestamp'])
+            if snap_date >= cutoff_date:
+                holdings = db.get_holdings(snap['id'])
+                snapshots_to_export.append({
+                    'id': snap['id'],
+                    'timestamp': snap['timestamp'],
+                    'total_value': snap['total_value'],
+                    'holdings': holdings
+                })
 
     # Generate output filename if not specified
     if not output_file:
