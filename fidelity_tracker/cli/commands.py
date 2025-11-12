@@ -316,5 +316,145 @@ def dashboard(ctx):
         raise click.Abort()
 
 
+@cli.command()
+@click.argument('output_file', type=click.Path(), required=False)
+@click.option('--snapshot-id', '-s', type=int, help='Specific snapshot ID to export')
+@click.option('--days', '-d', type=int, default=90, help='Export snapshots from last N days')
+@click.option('--format', '-f', type=click.Choice(['csv', 'json']), default='csv', help='Output format')
+@click.pass_context
+def export(ctx, output_file, snapshot_id, days, format):
+    """Export portfolio data to file"""
+    config = ctx.obj['config']
+    db = DatabaseManager(config.get('database.path', 'fidelity_portfolio.db'))
+
+    import json
+    import csv
+
+    if snapshot_id:
+        # Export specific snapshot
+        holdings = db.get_holdings(snapshot_id)
+        if not holdings:
+            console.print(f"[red]No holdings found for snapshot #{snapshot_id}[/red]")
+            return
+
+        snapshots_to_export = [{'id': snapshot_id, 'holdings': holdings}]
+    else:
+        # Export from date range
+        history = db.get_portfolio_history(days)
+        if not history:
+            console.print("[yellow]No snapshots found in the specified date range.[/yellow]")
+            return
+
+        snapshots_to_export = []
+        for snap in history:
+            holdings = db.get_holdings(snap['id'])
+            snapshots_to_export.append({
+                'id': snap['id'],
+                'timestamp': snap['timestamp'],
+                'total_value': snap['total_value'],
+                'holdings': holdings
+            })
+
+    # Generate output filename if not specified
+    if not output_file:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output_file = f"portfolio_export_{timestamp}.{format}"
+
+    output_path = Path(output_file)
+
+    try:
+        if format == 'json':
+            with open(output_path, 'w') as f:
+                json.dump(snapshots_to_export, f, indent=2)
+        else:  # csv
+            if snapshot_id:
+                # Single snapshot - flat CSV
+                with open(output_path, 'w', newline='') as f:
+                    if holdings:
+                        writer = csv.DictWriter(f, fieldnames=holdings[0].keys())
+                        writer.writeheader()
+                        writer.writerows(holdings)
+            else:
+                # Multiple snapshots - include snapshot info
+                with open(output_path, 'w', newline='') as f:
+                    fieldnames = ['snapshot_id', 'timestamp', 'total_value'] + list(snapshots_to_export[0]['holdings'][0].keys() if snapshots_to_export[0]['holdings'] else [])
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+
+                    for snap in snapshots_to_export:
+                        for holding in snap['holdings']:
+                            row = {
+                                'snapshot_id': snap['id'],
+                                'timestamp': snap.get('timestamp', ''),
+                                'total_value': snap.get('total_value', 0),
+                                **holding
+                            }
+                            writer.writerow(row)
+
+        console.print(f"[green]✓ Exported to {output_path}[/green]")
+        console.print(f"  Snapshots: {len(snapshots_to_export)}")
+
+    except Exception as e:
+        logger.exception("Export failed")
+        console.print(f"[red]✗ Export failed: {e}[/red]")
+        raise click.Abort()
+
+
+@cli.command()
+@click.argument('input_file', type=click.Path(exists=True))
+@click.option('--format', '-f', type=click.Choice(['csv', 'json']), help='Input format (auto-detect if not specified)')
+@click.pass_context
+def import_data(ctx, input_file, format):
+    """Import portfolio data from external file"""
+    config = ctx.obj['config']
+    db = DatabaseManager(config.get('database.path', 'fidelity_portfolio.db'))
+    storage = StorageManager(config.get('storage.output_dir', '.'))
+
+    import json
+    import csv
+
+    input_path = Path(input_file)
+
+    # Auto-detect format
+    if not format:
+        format = 'json' if input_path.suffix == '.json' else 'csv'
+
+    console.print(f"[bold blue]Importing data from {input_path}...[/bold blue]")
+
+    try:
+        if format == 'json':
+            with open(input_path) as f:
+                data = json.load(f)
+
+            # Validate structure
+            if 'accounts' in data and 'timestamp' in data:
+                # Standard portfolio data format
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+                # Save to storage
+                files = storage.save_all(data, f"imported_{timestamp}")
+                console.print(f"  ✓ Saved JSON: {files['json']}")
+                console.print(f"  ✓ Saved CSV: {files['holdings_csv']}")
+
+                # Save to database
+                snapshot_id = db.save_snapshot(data)
+                console.print(f"  ✓ Saved to database (snapshot #{snapshot_id})")
+
+                console.print(f"\n[green]✓ Import complete![/green]")
+            else:
+                console.print("[red]Invalid JSON format. Expected 'accounts' and 'timestamp' fields.[/red]")
+                raise click.Abort()
+
+        else:  # CSV
+            console.print("[yellow]CSV import not yet fully implemented.[/yellow]")
+            console.print("Use JSON format for full portfolio import.")
+            raise click.Abort()
+
+    except Exception as e:
+        logger.exception("Import failed")
+        console.print(f"[red]✗ Import failed: {e}[/red]")
+        raise click.Abort()
+
+
 if __name__ == '__main__':
     cli(obj={})
