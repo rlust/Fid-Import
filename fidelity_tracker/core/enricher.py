@@ -3,7 +3,7 @@ Data enricher using Yahoo Finance
 Adds company information, sector, industry, and financial metrics
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 from time import sleep
 import yfinance as yf
 from loguru import logger
@@ -12,16 +12,18 @@ from loguru import logger
 class DataEnricher:
     """Enriches portfolio data with Yahoo Finance information"""
 
-    def __init__(self, delay: float = 3.0, max_retries: int = 3):
+    def __init__(self, delay: float = 3.0, max_retries: int = 3, progress_callback: Optional[Callable] = None):
         """
         Initialize the enricher
 
         Args:
             delay: Delay between API calls in seconds
             max_retries: Maximum number of retries for failed requests
+            progress_callback: Optional callback function for progress updates (current, total, ticker)
         """
         self.delay = delay
         self.max_retries = max_retries
+        self.progress_callback = progress_callback
         self._cache = {}  # Cache ticker data to avoid duplicate calls
 
     def enrich_ticker(self, ticker: str) -> Dict[str, Any]:
@@ -123,6 +125,11 @@ class DataEnricher:
         # Fetch data for each unique ticker
         for i, ticker in enumerate(sorted(unique_tickers), 1):
             logger.info(f"[{i}/{len(unique_tickers)}] Processing {ticker}...")
+
+            # Call progress callback if provided
+            if self.progress_callback:
+                self.progress_callback(i, len(unique_tickers), ticker)
+
             self.enrich_ticker(ticker)
 
         # Apply enrichment data to all holdings
@@ -182,14 +189,24 @@ class DataEnricher:
         data['accounts'] = self.enrich_accounts(accounts, total_portfolio_value)
         return data
 
+    def _should_skip_ticker(self, ticker: str) -> bool:
+        """Check if ticker should be skipped (cash/money market)"""
+        ticker_clean = ticker.replace('**', '').strip()
+        return not ticker_clean or ticker_clean in [
+            'N/A', 'CASH', 'USD', 'FZDXX', 'FDRXX', 'SPAXX',
+            'SPRXX', 'FDLXX', 'FZFXX', 'FDIC'
+        ]
+
     def clear_cache(self) -> None:
         """Clear the ticker data cache"""
+        cache_size = len(self._cache)
         self._cache.clear()
-        logger.info("Enrichment cache cleared")
+        logger.info(f"Enrichment cache cleared ({cache_size} tickers)")
 
-    def get_cache_stats(self) -> Dict[str, int]:
+    def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics"""
         return {
             'cached_tickers': len(self._cache),
-            'cache_size_bytes': len(str(self._cache))
+            'cache_size_bytes': len(str(self._cache)),
+            'tickers': list(self._cache.keys())
         }
