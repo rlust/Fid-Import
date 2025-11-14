@@ -11,6 +11,9 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 EXPORT_DIR="$PROJECT_ROOT/exports"
 LOVEABLE_REPO="${LOVEABLE_REPO_PATH:-$HOME/fidelity-portfolio-18884}"  # Override with env var
 
+# Change to project root directory (critical for portfolio-tracker to work)
+cd "$PROJECT_ROOT"
+
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
