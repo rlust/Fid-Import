@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useComprehensiveRisk } from '@/hooks/useRisk';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { PeriodSelector } from '@/components/shared/PeriodSelector';
+import { CorrelationHeatmap } from '@/components/visualizations/CorrelationHeatmap';
 import { formatCurrency, formatPercent } from '@/lib/formatters';
 import { AlertTriangle, TrendingDown, Shield, Target } from 'lucide-react';
 
@@ -24,6 +25,7 @@ export default function RiskPage() {
   const beta = riskData?.beta;
   const var_data = riskData?.value_at_risk;
   const drawdown = riskData?.max_drawdown;
+  const correlation = riskData?.correlation_matrix;
 
   return (
     <div className="space-y-8">
@@ -232,6 +234,14 @@ export default function RiskPage() {
           </div>
         </div>
       </div>
+
+      {/* Correlation Matrix */}
+      {correlation && Object.keys(correlation).length > 0 && (
+        <CorrelationHeatmap
+          data={correlation}
+          title="Holdings Correlation Matrix"
+        />
+      )}
 
       {/* Info Footer */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">

@@ -1,16 +1,34 @@
 'use client';
 
-import { usePortfolioSummary, useTopHoldings, useSectorAllocation, usePortfolioHistory } from '@/hooks/usePortfolio';
+import { usePortfolioSummary, useTopHoldings, useSectorAllocation, usePortfolioHistory, useHoldings } from '@/hooks/usePortfolio';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { PortfolioTimeline } from '@/components/performance/PortfolioTimeline';
+import { PortfolioTreemap } from '@/components/visualizations/PortfolioTreemap';
+import { SectorPieChart } from '@/components/visualizations/SectorPieChart';
 import { formatCurrency, formatPercent, formatDateTime } from '@/lib/formatters';
 import { Wallet, TrendingUp, TrendingDown, Activity } from 'lucide-react';
 
 export default function DashboardPage() {
   const { data: summary, isLoading: summaryLoading, error: summaryError } = usePortfolioSummary();
   const { data: topHoldings, isLoading: holdingsLoading } = useTopHoldings(5);
+  const { data: allHoldings, isLoading: allHoldingsLoading } = useHoldings();
   const { data: sectors, isLoading: sectorsLoading } = useSectorAllocation();
   const { data: history, isLoading: historyLoading } = usePortfolioHistory(30);
+
+  // Transform holdings for treemap visualization
+  const treemapData = allHoldings?.map((holding) => ({
+    name: holding.symbol || 'N/A',
+    size: holding.value || 0,
+    value: holding.portfolio_weight ? holding.portfolio_weight / 100 : 0,
+    sector: holding.sector || 'Other',
+  })) || [];
+
+  // Transform sectors for pie chart
+  const sectorPieData = sectors?.map((sector) => ({
+    name: sector.sector,
+    value: sector.total_value || 0,
+    percentage: sector.percentage || 0,
+  })) || [];
 
   if (summaryError) {
     return (
@@ -68,6 +86,14 @@ export default function DashboardPage() {
       {/* Portfolio Timeline Chart */}
       <PortfolioTimeline data={history} isLoading={historyLoading} />
 
+      {/* Portfolio Allocation Treemap */}
+      {!allHoldingsLoading && treemapData.length > 0 && (
+        <PortfolioTreemap
+          data={treemapData}
+          title="Portfolio Allocation by Holdings"
+        />
+      )}
+
       {/* Top Holdings */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Top Holdings</h2>
@@ -105,32 +131,13 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Sector Allocation */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Sector Allocation</h2>
-        {sectorsLoading ? (
-          <div className="text-gray-500">Loading...</div>
-        ) : sectors && sectors.length > 0 ? (
-          <div className="space-y-3">
-            {sectors.slice(0, 5).map((sector) => (
-              <div key={sector.sector} className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-gray-900">{sector.sector}</span>
-                  <span className="text-gray-600">{formatPercent(sector.percentage)}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full"
-                    style={{ width: `${sector.percentage}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-gray-500">No sector data available</div>
-        )}
-      </div>
+      {/* Sector Allocation - Pie Chart */}
+      {!sectorsLoading && sectorPieData.length > 0 && (
+        <SectorPieChart
+          data={sectorPieData}
+          title="Sector Allocation"
+        />
+      )}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
