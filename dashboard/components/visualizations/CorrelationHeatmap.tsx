@@ -26,11 +26,11 @@ export function CorrelationHeatmap({ data, title }: CorrelationHeatmapProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
       {title && (
         <div className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          <p className="text-sm text-gray-600 mt-1">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
             Correlation matrix showing relationship between holdings
           </p>
         </div>

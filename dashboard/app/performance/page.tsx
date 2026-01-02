@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { usePerformance, useTopContributors, useSectorAttribution } from '@/hooks/usePerformance';
+import { usePortfolioHistory } from '@/hooks/usePortfolio';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { PeriodSelector } from '@/components/shared/PeriodSelector';
+import { InteractivePerformanceChart } from '@/components/visualizations/InteractivePerformanceChart';
 import { formatCurrency, formatPercent, formatDate } from '@/lib/formatters';
 import { TrendingUp, TrendingDown, Target, BarChart3, PieChart } from 'lucide-react';
 
@@ -13,6 +15,13 @@ export default function PerformancePage() {
   const { data: performance, isLoading: perfLoading, error: perfError } = usePerformance(selectedPeriod);
   const { data: contributors, isLoading: contribLoading } = useTopContributors(Math.min(selectedPeriod, 30));
   const { data: sectorAttribution, isLoading: sectorLoading } = useSectorAttribution(Math.min(selectedPeriod, 30));
+  const { data: history, isLoading: historyLoading } = usePortfolioHistory(selectedPeriod);
+
+  // Transform history data for interactive chart
+  const chartData = history?.history?.map((point: any) => ({
+    date: point.date,
+    value: point.total_value,
+  })) || [];
 
   if (perfError) {
     return (
@@ -121,6 +130,15 @@ export default function PerformancePage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Interactive Performance Chart */}
+      {!historyLoading && chartData.length > 0 && (
+        <InteractivePerformanceChart
+          data={chartData}
+          title="Portfolio Value Over Time"
+          height={450}
+        />
       )}
 
       {/* Top Contributors */}

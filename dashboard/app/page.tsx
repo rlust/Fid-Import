@@ -48,8 +48,8 @@ export default function DashboardPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="mt-2 text-gray-600">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
           Overview of your investment portfolio
         </p>
       </div>
@@ -95,10 +95,10 @@ export default function DashboardPage() {
       )}
 
       {/* Top Holdings */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Top Holdings</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Top Holdings</h2>
         {holdingsLoading ? (
-          <div className="text-gray-500">Loading...</div>
+          <div className="text-gray-500 dark:text-gray-400">Loading...</div>
         ) : topHoldings && topHoldings.length > 0 ? (
           <div className="space-y-3">
             {topHoldings.map((holding, index) => (
@@ -108,18 +108,18 @@ export default function DashboardPage() {
               >
                 <div className="flex-1">
                   <div className="flex items-center space-x-3">
-                    <div className="font-semibold text-gray-900">{holding.symbol}</div>
-                    <div className="text-sm text-gray-500">{holding.company_name}</div>
+                    <div className="font-semibold text-gray-900 dark:text-white">{holding.symbol}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">{holding.company_name}</div>
                   </div>
-                  <div className="mt-1 text-sm text-gray-600">
+                  <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                     {holding.quantity} shares @ {formatCurrency(holding.last_price)}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="font-semibold text-gray-900">
+                  <div className="font-semibold text-gray-900 dark:text-white">
                     {formatCurrency(holding.value)}
                   </div>
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
                     {formatPercent(holding.portfolio_weight)}
                   </div>
                 </div>
@@ -127,7 +127,7 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="text-gray-500">No holdings data available</div>
+          <div className="text-gray-500 dark:text-gray-400">No holdings data available</div>
         )}
       </div>
 
@@ -143,34 +143,34 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <a
           href="/transactions"
-          className="bg-white rounded-lg border border-gray-200 p-6 hover:border-blue-300 transition-colors cursor-pointer"
+          className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-pointer"
         >
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             Add Transaction
           </h3>
-          <p className="text-gray-600 text-sm">
+          <p className="text-gray-600 dark:text-gray-400 text-sm">
             Record a new buy, sell, or dividend transaction
           </p>
         </a>
         <a
           href="/performance"
-          className="bg-white rounded-lg border border-gray-200 p-6 hover:border-blue-300 transition-colors cursor-pointer"
+          className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-pointer"
         >
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             View Performance
           </h3>
-          <p className="text-gray-600 text-sm">
+          <p className="text-gray-600 dark:text-gray-400 text-sm">
             Analyze returns and compare with benchmarks
           </p>
         </a>
         <a
           href="/analytics"
-          className="bg-white rounded-lg border border-gray-200 p-6 hover:border-blue-300 transition-colors cursor-pointer"
+          className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-pointer"
         >
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             Advanced Analytics
           </h3>
-          <p className="text-gray-600 text-sm">
+          <p className="text-gray-600 dark:text-gray-400 text-sm">
             Explore risk metrics and correlations
           </p>
         </a>
