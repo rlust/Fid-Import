@@ -37,7 +37,7 @@ export default function RiskPage() {
             Understand your portfolio's risk profile and volatility
           </p>
         </div>
-        <PeriodSelector value={days} onChange={setDays} />
+        <PeriodSelector selectedDays={days} onSelect={setDays} />
       </div>
 
       {/* Volatility Metrics */}
@@ -51,7 +51,7 @@ export default function RiskPage() {
                 ? formatPercent(volatility?.daily_volatility)
                 : 'N/A'
             }
-            description="Standard deviation of daily returns"
+            subtitle="Standard deviation of daily returns"
             icon={TrendingDown}
           />
           <MetricCard
@@ -61,13 +61,13 @@ export default function RiskPage() {
                 ? formatPercent(volatility?.annualized_volatility)
                 : 'N/A'
             }
-            description="Volatility scaled to annual basis"
+            subtitle="Volatility scaled to annual basis"
             icon={TrendingDown}
           />
           <MetricCard
             title="Data Points"
             value={volatility?.data_points?.toString() || '0'}
-            description="Number of snapshots analyzed"
+            subtitle="Number of snapshots analyzed"
           />
         </div>
       </div>
@@ -85,9 +85,8 @@ export default function RiskPage() {
                 ? sharpe?.sharpe_ratio?.toFixed(2)
                 : 'N/A'
             }
-            description="Return per unit of risk (higher is better)"
+            subtitle="Return per unit of risk (higher is better)"
             icon={Target}
-            trend={sharpe?.sharpe_ratio > 1 ? 'up' : undefined}
           />
           <MetricCard
             title="Annualized Return"
@@ -96,12 +95,12 @@ export default function RiskPage() {
                 ? formatPercent(sharpe?.annualized_return * 100)
                 : 'N/A'
             }
-            description="Average annual return"
+            subtitle="Average annual return"
           />
           <MetricCard
             title="Risk-Free Rate"
             value={formatPercent(sharpe?.risk_free_rate * 100)}
-            description="Benchmark for risk-free returns"
+            subtitle="Benchmark for risk-free returns"
           />
         </div>
       </div>
@@ -115,30 +114,28 @@ export default function RiskPage() {
           <MetricCard
             title="Beta"
             value={beta?.beta !== null ? beta?.beta?.toFixed(2) : 'N/A'}
-            description="Sensitivity to market movements"
-            icon={Shield}
             subtitle={
               beta?.beta !== null && beta?.beta > 1
                 ? 'More volatile than market'
                 : beta?.beta !== null && beta?.beta < 1
                 ? 'Less volatile than market'
-                : undefined
+                : 'Sensitivity to market movements'
             }
+            icon={Shield}
           />
           <MetricCard
             title="Alpha"
             value={
               beta?.alpha !== null ? formatPercent(beta?.alpha) : 'N/A'
             }
-            description="Excess return vs market"
-            trend={beta?.alpha > 0 ? 'up' : beta?.alpha < 0 ? 'down' : undefined}
+            subtitle="Excess return vs market"
           />
           <MetricCard
             title="R-Squared"
             value={
               beta?.r_squared !== null ? beta?.r_squared?.toFixed(3) : 'N/A'
             }
-            description="How well returns match market"
+            subtitle="How well returns match market"
           />
           <MetricCard
             title="Correlation"
@@ -147,7 +144,7 @@ export default function RiskPage() {
                 ? beta?.correlation?.toFixed(3)
                 : 'N/A'
             }
-            description="Relationship with market"
+            subtitle="Relationship with market"
           />
         </div>
         {beta?.data_points === 0 && (

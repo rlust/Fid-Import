@@ -33,7 +33,7 @@ export default function OptimizePage() {
             Maximize risk-adjusted returns with optimal allocation
           </p>
         </div>
-        <PeriodSelector value={days} onChange={setDays} />
+        <PeriodSelector selectedDays={days} onSelect={setDays} />
       </div>
 
       {/* Optimal Portfolio Metrics */}
@@ -46,21 +46,19 @@ export default function OptimizePage() {
             <MetricCard
               title="Expected Return"
               value={formatPercent(optimal.metrics.expected_return * 100)}
-              description="Annualized expected return"
+              subtitle="Annualized expected return"
               icon={TrendingUp}
-              trend="up"
             />
             <MetricCard
               title="Volatility"
               value={formatPercent(optimal.metrics.volatility * 100)}
-              description="Annualized standard deviation"
+              subtitle="Annualized standard deviation"
             />
             <MetricCard
               title="Sharpe Ratio"
               value={optimal.metrics.sharpe_ratio?.toFixed(2) || 'N/A'}
-              description="Risk-adjusted return metric"
+              subtitle="Risk-adjusted return metric"
               icon={Target}
-              trend={optimal.metrics.sharpe_ratio > 1 ? 'up' : undefined}
             />
           </div>
         </div>
