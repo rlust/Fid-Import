@@ -9,7 +9,7 @@ import { MetricCard } from '@/components/shared/MetricCard';
 import { SectorPieChart } from '@/components/visualizations/SectorPieChart';
 import { CorrelationHeatmap } from '@/components/visualizations/CorrelationHeatmap';
 import { formatPercent, formatCurrency } from '@/lib/formatters';
-import { TrendingUp, Target, Shield, AlertTriangle, PieChart as PieChartIcon } from 'lucide-react';
+import { TrendingUp, Target, Shield, AlertTriangle, PieChart as PieChartIcon, Download } from 'lucide-react';
 
 export default function AnalyticsPage() {
   const [days, setDays] = useState(365);
@@ -29,6 +29,89 @@ export default function AnalyticsPage() {
 
   const isLoading = riskLoading || perfLoading;
 
+  const exportToCSV = () => {
+    if (!performance && !riskData && !contributors && !sectorAttribution) return;
+
+    const csvSections: string[] = [];
+
+    // Key Metrics Section
+    csvSections.push('KEY METRICS');
+    csvSections.push('Metric,Value,Period');
+    csvSections.push(
+      `Time-Weighted Return,${performance?.returns?.twr_percent?.toFixed(2) || 'N/A'}%,${days} days`
+    );
+    csvSections.push(
+      `Sharpe Ratio,${riskData?.sharpe_ratio?.sharpe_ratio?.toFixed(2) || 'N/A'},Risk-adjusted return`
+    );
+    csvSections.push(
+      `Portfolio Beta,${riskData?.beta?.beta?.toFixed(2) || 'N/A'},vs S&P 500`
+    );
+    csvSections.push(
+      `Annualized Volatility,${riskData?.volatility?.annualized_volatility?.toFixed(2) || 'N/A'}%,Annualized`
+    );
+    csvSections.push('');
+
+    // Top Contributors Section
+    if (contributors?.top_contributors && contributors.top_contributors.length > 0) {
+      csvSections.push('TOP PERFORMANCE CONTRIBUTORS (Last 30 Days)');
+      csvSections.push('Ticker,Portfolio Weight %,Holding Return %,Contribution %');
+      contributors.top_contributors.slice(0, 10).forEach((holding: any) => {
+        csvSections.push(
+          `${holding.ticker},${holding.weight_percent?.toFixed(2) || 0},${
+            holding.holding_return_percent?.toFixed(2) || 0
+          },${holding.contribution_percent?.toFixed(2) || 0}`
+        );
+      });
+      csvSections.push('');
+    }
+
+    // Sector Attribution Section
+    if (sectorAttribution && sectorAttribution.length > 0) {
+      csvSections.push('SECTOR ATTRIBUTION (Last 30 Days)');
+      csvSections.push('Sector,Weight %,Holdings Count,Sector Return %,Contribution %');
+      sectorAttribution.forEach((sector: any) => {
+        csvSections.push(
+          `${sector.sector || 'Unknown'},${sector.weight_percent?.toFixed(2) || 0},${
+            sector.holdings_count || 0
+          },${sector.sector_return_percent?.toFixed(2) || 0},${
+            sector.contribution_percent?.toFixed(2) || 0
+          }`
+        );
+      });
+      csvSections.push('');
+    }
+
+    // Risk Metrics Section
+    if (riskData) {
+      csvSections.push('DETAILED RISK METRICS');
+      csvSections.push('Metric,Value');
+      if (riskData.volatility) {
+        csvSections.push(`Daily Volatility,${riskData.volatility.daily_volatility?.toFixed(4) || 'N/A'}%`);
+        csvSections.push(`Annualized Volatility,${riskData.volatility.annualized_volatility?.toFixed(2) || 'N/A'}%`);
+      }
+      if (riskData.sharpe_ratio) {
+        csvSections.push(`Sharpe Ratio,${riskData.sharpe_ratio.sharpe_ratio?.toFixed(3) || 'N/A'}`);
+        csvSections.push(`Annualized Return,${(riskData.sharpe_ratio.annualized_return * 100)?.toFixed(2) || 'N/A'}%`);
+      }
+      if (riskData.beta) {
+        csvSections.push(`Beta,${riskData.beta.beta?.toFixed(3) || 'N/A'}`);
+        csvSections.push(`Alpha,${riskData.beta.alpha?.toFixed(2) || 'N/A'}%`);
+        csvSections.push(`R-Squared,${riskData.beta.r_squared?.toFixed(3) || 'N/A'}`);
+      }
+    }
+
+    const csvContent = csvSections.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `portfolio-analytics-${days}d-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -39,7 +122,18 @@ export default function AnalyticsPage() {
             Comprehensive performance, risk, and allocation analytics
           </p>
         </div>
-        <PeriodSelector selectedDays={days} onSelect={setDays} />
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={exportToCSV}
+            disabled={isLoading}
+            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+            title="Export analytics report to CSV"
+          >
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export Report</span>
+          </button>
+          <PeriodSelector selectedDays={days} onSelect={setDays} />
+        </div>
       </div>
 
       {/* Key Metrics Overview */}
