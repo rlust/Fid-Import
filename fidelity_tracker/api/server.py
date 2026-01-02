@@ -16,7 +16,7 @@ import os
 from fidelity_tracker.database import DatabaseManager
 from fidelity_tracker.transactions import TransactionManager, CostBasisCalculator, FidelityCSVImporter, TransactionInferenceEngine
 from fidelity_tracker.benchmarks import BenchmarkFetcher
-from fidelity_tracker.analytics import PerformanceAnalytics, AttributionAnalytics, RiskAnalytics
+from fidelity_tracker.analytics import PerformanceAnalytics, AttributionAnalytics, RiskAnalytics, PortfolioOptimizer
 from fidelity_tracker.utils.config import Config
 
 # Initialize FastAPI app
@@ -79,6 +79,12 @@ def get_risk_analytics():
     config = Config()
     db_path = config.get('database.path', 'fidelity_portfolio.db')
     return RiskAnalytics(db_path)
+
+def get_portfolio_optimizer():
+    """Get portfolio optimizer"""
+    config = Config()
+    db_path = config.get('database.path', 'fidelity_portfolio.db')
+    return PortfolioOptimizer(db_path)
 
 
 def map_holding_fields(holding: Dict[str, Any]) -> Dict[str, Any]:
@@ -832,6 +838,80 @@ async def get_correlation_matrix(
         return risk.calculate_correlation_matrix(days=days, min_holdings=min_holdings)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to calculate correlation: {str(e)}")
+
+
+# Portfolio Optimization Endpoints
+@app.get("/api/v1/optimize/sharpe")
+async def optimize_sharpe(
+    days: int = Query(365, le=1095),
+    min_holdings: int = Query(5, ge=2, le=20),
+    optimizer: PortfolioOptimizer = Depends(get_portfolio_optimizer)
+):
+    """Get portfolio with maximum Sharpe ratio"""
+    try:
+        return optimizer.optimize_sharpe(days=days, min_holdings=min_holdings)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Optimization failed: {str(e)}")
+
+
+@app.get("/api/v1/optimize/min-volatility")
+async def optimize_min_volatility(
+    days: int = Query(365, le=1095),
+    min_holdings: int = Query(5, ge=2, le=20),
+    optimizer: PortfolioOptimizer = Depends(get_portfolio_optimizer)
+):
+    """Get portfolio with minimum volatility"""
+    try:
+        return optimizer.optimize_min_volatility(days=days, min_holdings=min_holdings)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Optimization failed: {str(e)}")
+
+
+@app.get("/api/v1/optimize/efficient-frontier")
+async def get_efficient_frontier(
+    days: int = Query(365, le=1095),
+    min_holdings: int = Query(5, ge=2, le=20),
+    num_points: int = Query(50, ge=10, le=100),
+    optimizer: PortfolioOptimizer = Depends(get_portfolio_optimizer)
+):
+    """Calculate efficient frontier"""
+    try:
+        return optimizer.calculate_efficient_frontier(days=days, min_holdings=min_holdings, num_points=num_points)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to calculate frontier: {str(e)}")
+
+
+@app.get("/api/v1/optimize/monte-carlo")
+async def run_monte_carlo(
+    days: int = Query(365, le=1095),
+    min_holdings: int = Query(5, ge=2, le=20),
+    num_simulations: int = Query(10000, ge=1000, le=50000),
+    time_horizon: int = Query(252, ge=30, le=1260),
+    optimizer: PortfolioOptimizer = Depends(get_portfolio_optimizer)
+):
+    """Run Monte Carlo simulation"""
+    try:
+        return optimizer.monte_carlo_simulation(
+            days=days,
+            min_holdings=min_holdings,
+            num_simulations=num_simulations,
+            time_horizon=time_horizon
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Simulation failed: {str(e)}")
+
+
+@app.get("/api/v1/optimize/rebalance")
+async def get_rebalancing_recommendations(
+    days: int = Query(365, le=1095),
+    min_holdings: int = Query(5, ge=2, le=20),
+    optimizer: PortfolioOptimizer = Depends(get_portfolio_optimizer)
+):
+    """Get rebalancing recommendations"""
+    try:
+        return optimizer.get_rebalancing_recommendations(days=days, min_holdings=min_holdings)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get recommendations: {str(e)}")
 
 
 # Error handlers

@@ -241,6 +241,31 @@ export const riskAPI = {
     fetchAPI(`/api/v1/risk/correlation?days=${days}&min_holdings=${minHoldings}`),
 };
 
+// Portfolio Optimization API
+export const optimizeAPI = {
+  optimizeSharpe: (days: number = 365, minHoldings: number = 5): Promise<any> =>
+    fetchAPI(`/api/v1/optimize/sharpe?days=${days}&min_holdings=${minHoldings}`),
+
+  optimizeMinVolatility: (days: number = 365, minHoldings: number = 5): Promise<any> =>
+    fetchAPI(`/api/v1/optimize/min-volatility?days=${days}&min_holdings=${minHoldings}`),
+
+  getEfficientFrontier: (days: number = 365, minHoldings: number = 5, numPoints: number = 50): Promise<any> =>
+    fetchAPI(`/api/v1/optimize/efficient-frontier?days=${days}&min_holdings=${minHoldings}&num_points=${numPoints}`),
+
+  runMonteCarlo: (
+    days: number = 365,
+    minHoldings: number = 5,
+    numSimulations: number = 10000,
+    timeHorizon: number = 252
+  ): Promise<any> =>
+    fetchAPI(
+      `/api/v1/optimize/monte-carlo?days=${days}&min_holdings=${minHoldings}&num_simulations=${numSimulations}&time_horizon=${timeHorizon}`
+    ),
+
+  getRebalancing: (days: number = 365, minHoldings: number = 5): Promise<any> =>
+    fetchAPI(`/api/v1/optimize/rebalance?days=${days}&min_holdings=${minHoldings}`),
+};
+
 // Health check
 export const healthAPI = {
   check: (): Promise<any> => fetchAPI('/health'),

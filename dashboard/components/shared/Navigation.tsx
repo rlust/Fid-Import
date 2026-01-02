@@ -10,6 +10,7 @@ import {
   Wallet,
   ArrowLeftRight,
   Shield,
+  Target,
   Lightbulb,
   Settings,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Performance', href: '/performance', icon: TrendingUp },
   { name: 'Risk', href: '/risk', icon: Shield },
+  { name: 'Optimize', href: '/optimize', icon: Target },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Holdings', href: '/holdings', icon: Wallet },
   { name: 'Transactions', href: '/transactions', icon: ArrowLeftRight },
