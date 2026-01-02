@@ -7,6 +7,7 @@ interface TreemapData {
   size: number;
   value?: number;
   sector?: string;
+  id?: string;
 }
 
 interface PortfolioTreemapProps {
@@ -28,6 +29,12 @@ const COLORS = [
 ];
 
 export function PortfolioTreemap({ data, title }: PortfolioTreemapProps) {
+  // Ensure data has unique keys
+  const uniqueData = data.map((item, index) => ({
+    ...item,
+    id: item.id || `${item.name}-${index}-${item.size}`,
+  }));
+
   const CustomizedContent = (props: any) => {
     const { x, y, width, height, index, name, size, value } = props;
 
@@ -99,8 +106,9 @@ export function PortfolioTreemap({ data, title }: PortfolioTreemapProps) {
       )}
       <ResponsiveContainer width="100%" height={400}>
         <Treemap
-          data={data}
+          data={uniqueData}
           dataKey="size"
+          nameKey="id"
           aspectRatio={4 / 3}
           stroke="#fff"
           fill="#8884d8"
