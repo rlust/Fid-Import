@@ -1,0 +1,236 @@
+'use client';
+
+import { useState } from 'react';
+import { useComprehensiveRisk } from '@/hooks/useRisk';
+import { usePerformance, useTopContributors, useSectorAttribution } from '@/hooks/usePerformance';
+import { useSectorAllocation } from '@/hooks/usePortfolio';
+import { PeriodSelector } from '@/components/shared/PeriodSelector';
+import { MetricCard } from '@/components/shared/MetricCard';
+import { SectorPieChart } from '@/components/visualizations/SectorPieChart';
+import { CorrelationHeatmap } from '@/components/visualizations/CorrelationHeatmap';
+import { formatPercent, formatCurrency } from '@/lib/formatters';
+import { TrendingUp, Target, Shield, AlertTriangle, PieChart as PieChartIcon } from 'lucide-react';
+
+export default function AnalyticsPage() {
+  const [days, setDays] = useState(365);
+
+  const { data: riskData, isLoading: riskLoading } = useComprehensiveRisk(days);
+  const { data: performance, isLoading: perfLoading } = usePerformance(days);
+  const { data: contributors, isLoading: contribLoading } = useTopContributors(Math.min(days, 30));
+  const { data: sectorAttribution, isLoading: sectorLoading } = useSectorAttribution(Math.min(days, 30));
+  const { data: sectors, isLoading: sectorsLoading } = useSectorAllocation();
+
+  // Transform sectors for pie chart
+  const sectorPieData = sectors?.map((sector) => ({
+    name: sector.sector,
+    value: sector.total_value || 0,
+    percentage: sector.percentage || 0,
+  })) || [];
+
+  const isLoading = riskLoading || perfLoading;
+
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Advanced Analytics</h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">
+            Comprehensive performance, risk, and allocation analytics
+          </p>
+        </div>
+        <PeriodSelector selectedDays={days} onSelect={setDays} />
+      </div>
+
+      {/* Key Metrics Overview */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Key Metrics</h2>
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 animate-pulse">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-4"></div>
+                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <MetricCard
+              title="Time-Weighted Return"
+              value={formatPercent(performance?.returns?.twr_percent)}
+              subtitle={`${days} day period`}
+              icon={TrendingUp}
+            />
+            <MetricCard
+              title="Sharpe Ratio"
+              value={
+                riskData?.sharpe_ratio?.sharpe_ratio !== null
+                  ? riskData?.sharpe_ratio?.sharpe_ratio?.toFixed(2)
+                  : 'N/A'
+              }
+              subtitle="Risk-adjusted return"
+              icon={Target}
+            />
+            <MetricCard
+              title="Portfolio Beta"
+              value={
+                riskData?.beta?.beta !== null
+                  ? riskData?.beta?.beta?.toFixed(2)
+                  : 'N/A'
+              }
+              subtitle="vs S&P 500"
+              icon={Shield}
+            />
+            <MetricCard
+              title="Volatility"
+              value={
+                riskData?.volatility?.annualized_volatility !== null
+                  ? formatPercent(riskData?.volatility?.annualized_volatility)
+                  : 'N/A'
+              }
+              subtitle="Annualized"
+              icon={AlertTriangle}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Sector Allocation */}
+      {!sectorsLoading && sectorPieData.length > 0 && (
+        <SectorPieChart
+          data={sectorPieData}
+          title="Sector Allocation"
+        />
+      )}
+
+      {/* Top Performance Contributors */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <TrendingUp className="h-6 w-6 text-green-600" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Top Performance Contributors (Last 30 Days)
+          </h2>
+        </div>
+        {contribLoading ? (
+          <div className="text-gray-500 dark:text-gray-400">Loading...</div>
+        ) : contributors?.top_contributors && contributors.top_contributors.length > 0 ? (
+          <div className="space-y-3">
+            {contributors.top_contributors.slice(0, 5).map((holding: any) => (
+              <div key={holding.ticker} className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3">
+                    <div className="font-semibold text-gray-900 dark:text-white">{holding.ticker}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {formatPercent(holding.weight_percent)} of portfolio
+                    </div>
+                  </div>
+                  <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    Return: {formatPercent(holding.holding_return_percent)}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-semibold text-green-600">
+                    +{formatPercent(holding.contribution_percent)}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">contribution</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-gray-500 dark:text-gray-400">No contributor data available</div>
+        )}
+      </div>
+
+      {/* Sector Attribution */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <PieChartIcon className="h-6 w-6 text-blue-600" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Sector Attribution (Last 30 Days)
+          </h2>
+        </div>
+        {sectorLoading ? (
+          <div className="text-gray-500 dark:text-gray-400">Loading...</div>
+        ) : sectorAttribution && sectorAttribution.length > 0 ? (
+          <div className="space-y-4">
+            {sectorAttribution.map((sector: any) => (
+              <div key={sector.sector} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-gray-900 dark:text-white">{sector.sector || 'Unknown'}</span>
+                      <span className="text-gray-600 dark:text-gray-400">{formatPercent(sector.weight_percent)}</span>
+                    </div>
+                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {sector.holdings_count} holdings • Return: {formatPercent(sector.sector_return_percent)}
+                    </div>
+                  </div>
+                  <div className="ml-6 text-right">
+                    <span
+                      className={`text-sm font-medium ${
+                        (sector.contribution || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
+                      {(sector.contribution || 0) >= 0 ? '+' : ''}
+                      {formatPercent(sector.contribution_percent)}
+                    </span>
+                  </div>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full ${
+                      (sector.contribution || 0) >= 0 ? 'bg-green-600' : 'bg-red-600'
+                    }`}
+                    style={{
+                      width: `${Math.min(Math.abs(sector.contribution_percent || 0) * 10, 100)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-gray-500 dark:text-gray-400">No sector attribution data available</div>
+        )}
+      </div>
+
+      {/* Correlation Matrix */}
+      {riskData?.correlation_matrix && Object.keys(riskData.correlation_matrix).length > 0 && (
+        <CorrelationHeatmap
+          data={riskData.correlation_matrix}
+          title="Holdings Correlation Matrix"
+        />
+      )}
+
+      {/* Risk Summary */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+        <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-2">
+          Analytics Summary
+        </h3>
+        <div className="text-sm text-blue-800 dark:text-blue-400 space-y-2">
+          <p>
+            <strong>Performance:</strong> Your portfolio has a time-weighted return of{' '}
+            {formatPercent(performance?.returns?.twr_percent)} over the last {days} days.
+          </p>
+          <p>
+            <strong>Risk Profile:</strong> With a Sharpe ratio of{' '}
+            {riskData?.sharpe_ratio?.sharpe_ratio?.toFixed(2) || 'N/A'}, your portfolio is generating{' '}
+            {riskData?.sharpe_ratio?.sharpe_ratio > 1 ? 'good' : 'moderate'} risk-adjusted returns.
+          </p>
+          <p>
+            <strong>Market Exposure:</strong> A beta of {riskData?.beta?.beta?.toFixed(2) || 'N/A'} indicates your
+            portfolio is{' '}
+            {riskData?.beta?.beta > 1
+              ? 'more volatile than'
+              : riskData?.beta?.beta < 1
+              ? 'less volatile than'
+              : 'aligned with'}{' '}
+            the broader market.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
