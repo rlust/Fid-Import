@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
 from fidelity_tracker.core.collector import PortfolioCollector
 from fidelity_tracker.core.enricher import DataEnricher
-from fidelity_tracker.core.database import DatabaseManager
+from fidelity_tracker.database import DatabaseManager
 from fidelity_tracker.core.storage import StorageManager
 
 

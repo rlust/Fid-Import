@@ -8,6 +8,6 @@ __author__ = 'Randy Lust'
 
 from fidelity_tracker.core.collector import PortfolioCollector
 from fidelity_tracker.core.enricher import DataEnricher
-from fidelity_tracker.core.database import DatabaseManager
+from fidelity_tracker.database import DatabaseManager
 
 __all__ = ['PortfolioCollector', 'DataEnricher', 'DatabaseManager']

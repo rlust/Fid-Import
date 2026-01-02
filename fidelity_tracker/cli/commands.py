@@ -13,7 +13,7 @@ from pathlib import Path
 
 from fidelity_tracker.core.collector import PortfolioCollector
 from fidelity_tracker.core.enricher import DataEnricher
-from fidelity_tracker.core.database import DatabaseManager
+from fidelity_tracker.database import DatabaseManager, MigrationManager
 from fidelity_tracker.core.storage import StorageManager
 from fidelity_tracker.utils.config import Config
 from fidelity_tracker.utils.logger import setup_logging
@@ -531,7 +531,7 @@ def dashboard(ctx):
 @click.argument('output_file', type=click.Path(), required=False)
 @click.option('--snapshot-id', '-s', type=int, help='Specific snapshot ID to export')
 @click.option('--days', '-d', type=int, default=90, help='Export snapshots from last N days')
-@click.option('--format', '-f', type=click.Choice(['csv', 'json']), default='csv', help='Output format')
+@click.option('--format', '-f', type=click.Choice(['csv', 'json', 'loveable']), default='csv', help='Output format')
 @click.pass_context
 def export(ctx, output_file, snapshot_id, days, format):
     """Export portfolio data to file"""
@@ -573,12 +573,49 @@ def export(ctx, output_file, snapshot_id, days, format):
     # Generate output filename if not specified
     if not output_file:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        output_file = f"portfolio_export_{timestamp}.{format}"
+        ext = 'json' if format in ['json', 'loveable'] else format
+        output_file = f"portfolio_export_{timestamp}.{ext}"
 
     output_path = Path(output_file)
 
     try:
-        if format == 'json':
+        if format == 'loveable':
+            # Export in Loveable.ai format (single snapshot only)
+            latest_snap = snapshots_to_export[0] if snapshots_to_export else None
+            if not latest_snap:
+                console.print("[red]No snapshot data to export[/red]")
+                return
+
+            # Transform to Loveable.ai format
+            loveable_data = {
+                "metadata": {
+                    "export_date": datetime.now().isoformat(),
+                    "total_value": latest_snap['total_value'],
+                    "holdings_count": len(latest_snap['holdings']),
+                    "last_updated": latest_snap['timestamp']
+                },
+                "holdings": []
+            }
+
+            # Transform holdings fields
+            for holding in latest_snap['holdings']:
+                loveable_holding = {
+                    "ticker": holding.get('ticker', 'N/A'),
+                    "company_name": holding.get('company_name', ''),
+                    "quantity": holding.get('quantity', 0),
+                    "last_price": holding.get('last_price', 0),
+                    "current_value": holding.get('value', 0),  # value -> current_value
+                    "weight_percent": holding.get('portfolio_weight', 0),  # portfolio_weight -> weight_percent
+                    "sector": holding.get('sector'),
+                    "account_name": f"Account {holding.get('account_id', '')}",
+                    "account_number": holding.get('account_id')
+                }
+                loveable_data['holdings'].append(loveable_holding)
+
+            with open(output_path, 'w') as f:
+                json.dump(loveable_data, f, indent=2)
+
+        elif format == 'json':
             with open(output_path, 'w') as f:
                 json.dump(snapshots_to_export, f, indent=2)
         else:  # csv
@@ -751,6 +788,121 @@ def cache(ctx):
         console.print("\n[yellow]No cached data. Run enrichment to populate cache.[/yellow]")
 
     console.print("\n[dim]Note: Cache is cleared between runs. Use --clear-cache flag with enrich command to force refresh.[/dim]")
+
+
+@cli.command()
+@click.option('--version', '-v', type=int, help='Target schema version (default: latest)')
+@click.option('--rollback', is_flag=True, help='Rollback to version 1 (WARNING: deletes transaction data)')
+@click.option('--dry-run', is_flag=True, help='Show migration plan without executing')
+@click.pass_context
+def migrate(ctx, version, rollback, dry_run):
+    """Run database migrations to add new features"""
+
+    config = ctx.obj['config']
+    db_path = config.get('database.path', 'fidelity_portfolio.db')
+
+    migration_mgr = MigrationManager(db_path)
+    current_version = migration_mgr.get_current_version()
+
+    console.print(f"[bold blue]Database Migration Tool[/bold blue]\n")
+    console.print(f"Database: {db_path}")
+    console.print(f"Current schema version: {current_version}\n")
+
+    if dry_run:
+        console.print("[yellow]DRY RUN MODE - No changes will be made[/yellow]\n")
+        if rollback:
+            console.print("[bold]Would rollback to version 1:[/bold]")
+            console.print("  - Drop tables: transactions, cost_basis, benchmarks, benchmark_data, calculated_metrics, user_preferences")
+            console.print("  - Keep new columns in holdings/snapshots (will be NULL)")
+            console.print("\n[red]WARNING: This would delete all transaction and performance tracking data![/red]")
+        else:
+            target = version or 2
+            if current_version < target:
+                console.print(f"[bold]Would migrate from v{current_version} to v{target}:[/bold]")
+                console.print("\n[bold]New tables:[/bold]")
+                console.print("  - transactions: Track buys, sells, dividends, fees")
+                console.print("  - cost_basis: Track acquisition costs for gain/loss calculations")
+                console.print("  - benchmarks: Reference data (S&P 500, NASDAQ, etc.)")
+                console.print("  - benchmark_data: Historical benchmark prices")
+                console.print("  - calculated_metrics: Cache for expensive calculations")
+                console.print("  - user_preferences: User settings")
+                console.print("\n[bold]New columns:[/bold]")
+                console.print("  holdings: cost_basis, gain_loss, gain_loss_percent, day_change, day_change_percent")
+                console.print("  snapshots: total_cost_basis, total_gain_loss, total_return_percent, day_change")
+            else:
+                console.print(f"[green]Database already at version {current_version}[/green]")
+        return
+
+    if rollback:
+        if current_version <= 1:
+            console.print("[yellow]Already at version 1, nothing to rollback[/yellow]")
+            return
+
+        console.print("[bold red]WARNING: This will delete all transaction and performance tracking data![/bold red]")
+        if not click.confirm("\nAre you sure you want to rollback?"):
+            console.print("[yellow]Rollback cancelled[/yellow]")
+            return
+
+        try:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                task = progress.add_task("Rolling back database...", total=None)
+                migration_mgr.rollback_to_v1()
+                progress.update(task, completed=True)
+
+            console.print("[green]✓ Successfully rolled back to version 1[/green]")
+
+        except Exception as e:
+            console.print(f"[red]✗ Rollback failed: {e}[/red]")
+            logger.error(f"Rollback error: {e}")
+            raise click.Abort()
+
+    else:
+        # Forward migration
+        target = version or 2
+
+        if current_version >= target:
+            console.print(f"[green]Database already at version {current_version}[/green]")
+            return
+
+        console.print(f"[bold]Migrating from version {current_version} to {target}...[/bold]\n")
+
+        # Backup database first
+        import shutil
+        from datetime import datetime
+        backup_path = f"{db_path}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+        console.print(f"Creating backup: {backup_path}")
+        shutil.copy2(db_path, backup_path)
+        console.print("[green]✓ Backup created[/green]\n")
+
+        try:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                task = progress.add_task("Running migration...", total=None)
+                migration_mgr.migrate(target_version=target)
+                progress.update(task, completed=True)
+
+            new_version = migration_mgr.get_current_version()
+            console.print(f"\n[green]✓ Successfully migrated to version {new_version}[/green]")
+            console.print(f"\n[bold]New features available:[/bold]")
+            console.print("  • Transaction tracking (manual entry and CSV import)")
+            console.print("  • Cost basis and gain/loss calculations")
+            console.print("  • Benchmark comparison (S&P 500, NASDAQ, etc.)")
+            console.print("  • Performance metrics caching")
+            console.print("\n[dim]Backup saved to: {backup_path}[/dim]")
+
+        except Exception as e:
+            console.print(f"\n[red]✗ Migration failed: {e}[/red]")
+            console.print(f"[yellow]Restore from backup: {backup_path}[/yellow]")
+            logger.error(f"Migration error: {e}")
+            raise click.Abort()
 
 
 if __name__ == '__main__':

@@ -29,12 +29,12 @@ echo ""
 mkdir -p "$EXPORT_DIR"
 echo "📁 Export directory: $EXPORT_DIR"
 
-# Export latest snapshot as JSON
-echo "📊 Exporting latest portfolio data to JSON..."
-if portfolio-tracker export "$EXPORT_DIR/portfolio-latest.json" --format json; then
-    echo -e "${GREEN}✓${NC} JSON export complete"
+# Export latest snapshot in Loveable.ai format
+echo "📊 Exporting latest portfolio data in Loveable.ai format..."
+if portfolio-tracker export "$EXPORT_DIR/portfolio-latest.json" --format loveable; then
+    echo -e "${GREEN}✓${NC} Loveable.ai format export complete"
 else
-    echo -e "${RED}✗${NC} JSON export failed"
+    echo -e "${RED}✗${NC} Export failed"
     exit 1
 fi
 
@@ -71,10 +71,15 @@ if [ -d "$LOVEABLE_REPO" ]; then
 
     # Create data directory in Loveable repo
     mkdir -p "$LOVEABLE_REPO/data"
+    mkdir -p "$LOVEABLE_REPO/public"
 
-    # Copy JSON file
+    # Copy JSON file to data/ folder
     cp "$EXPORT_DIR/portfolio-latest.json" "$LOVEABLE_REPO/data/portfolio-latest.json"
-    echo -e "${GREEN}✓${NC} Copied portfolio-latest.json"
+    echo -e "${GREEN}✓${NC} Copied to data/portfolio-latest.json"
+
+    # Copy JSON file to public/ folder (for direct serving)
+    cp "$EXPORT_DIR/portfolio-latest.json" "$LOVEABLE_REPO/public/portfolio-latest.json"
+    echo -e "${GREEN}✓${NC} Copied to public/portfolio-latest.json"
 
     # Optionally copy CSV
     if [ -f "$EXPORT_DIR/portfolio-latest.csv" ]; then
@@ -100,7 +105,7 @@ if [ -d "$LOVEABLE_REPO" ]; then
             fi
 
             # Add, commit, and push
-            git add data/portfolio-latest.json data/portfolio-latest.csv 2>/dev/null || true
+            git add data/portfolio-latest.json public/portfolio-latest.json data/portfolio-latest.csv 2>/dev/null || true
 
             COMMIT_MSG="Update portfolio data $(date '+%Y-%m-%d %H:%M')"
             if git commit -m "$COMMIT_MSG"; then

@@ -4,7 +4,7 @@ Unit tests for fidelity_tracker.core.database module
 
 import pytest
 from datetime import datetime, timedelta
-from fidelity_tracker.core.database import DatabaseManager
+from fidelity_tracker.database import DatabaseManager
 
 
 @pytest.mark.unit

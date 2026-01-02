@@ -14,7 +14,7 @@ import sys
 # Add parent directory to path to import fidelity_tracker
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fidelity_tracker.core.database import DatabaseManager
+from fidelity_tracker.database import DatabaseManager
 from fidelity_tracker.utils.config import Config
 
 # Page configuration
