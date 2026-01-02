@@ -162,14 +162,14 @@ export default function RiskPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Risk Analytics</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
             Understand your portfolio's risk profile and volatility
           </p>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-4 flex-shrink-0">
           <button
             onClick={exportToCSV}
             disabled={isLoading}
