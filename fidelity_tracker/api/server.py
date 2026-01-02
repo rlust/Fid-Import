@@ -16,7 +16,7 @@ import os
 from fidelity_tracker.database import DatabaseManager
 from fidelity_tracker.transactions import TransactionManager, CostBasisCalculator, FidelityCSVImporter, TransactionInferenceEngine
 from fidelity_tracker.benchmarks import BenchmarkFetcher
-from fidelity_tracker.analytics import PerformanceAnalytics, AttributionAnalytics
+from fidelity_tracker.analytics import PerformanceAnalytics, AttributionAnalytics, RiskAnalytics
 from fidelity_tracker.utils.config import Config
 
 # Initialize FastAPI app
@@ -73,6 +73,12 @@ def get_attribution_analytics():
     config = Config()
     db_path = config.get('database.path', 'fidelity_portfolio.db')
     return AttributionAnalytics(db_path)
+
+def get_risk_analytics():
+    """Get risk analytics"""
+    config = Config()
+    db_path = config.get('database.path', 'fidelity_portfolio.db')
+    return RiskAnalytics(db_path)
 
 
 def map_holding_fields(holding: Dict[str, Any]) -> Dict[str, Any]:
@@ -738,6 +744,94 @@ async def get_top_contributors(
         return analytics.get_top_contributors(days=days, limit=limit)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get contributors: {str(e)}")
+
+
+# Risk Analytics Endpoints
+@app.get("/api/v1/risk/comprehensive")
+async def get_comprehensive_risk(
+    days: int = Query(365, le=1095),
+    risk: RiskAnalytics = Depends(get_risk_analytics)
+):
+    """Get comprehensive risk analysis report"""
+    try:
+        return risk.get_comprehensive_risk_report(days=days)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get risk report: {str(e)}")
+
+
+@app.get("/api/v1/risk/volatility")
+async def get_volatility(
+    days: int = Query(365, le=1095),
+    risk: RiskAnalytics = Depends(get_risk_analytics)
+):
+    """Get portfolio volatility metrics"""
+    try:
+        return risk.calculate_volatility(days=days)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to calculate volatility: {str(e)}")
+
+
+@app.get("/api/v1/risk/sharpe")
+async def get_sharpe_ratio(
+    days: int = Query(365, le=1095),
+    risk: RiskAnalytics = Depends(get_risk_analytics)
+):
+    """Get Sharpe ratio (risk-adjusted return)"""
+    try:
+        return risk.calculate_sharpe_ratio(days=days)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to calculate Sharpe ratio: {str(e)}")
+
+
+@app.get("/api/v1/risk/beta")
+async def get_beta(
+    days: int = Query(365, le=1095),
+    benchmark: str = Query('^GSPC', description="Benchmark symbol"),
+    risk: RiskAnalytics = Depends(get_risk_analytics)
+):
+    """Get portfolio beta vs benchmark"""
+    try:
+        return risk.calculate_beta(days=days, benchmark=benchmark)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to calculate beta: {str(e)}")
+
+
+@app.get("/api/v1/risk/var")
+async def get_value_at_risk(
+    days: int = Query(365, le=1095),
+    confidence: float = Query(0.95, ge=0.9, le=0.99),
+    risk: RiskAnalytics = Depends(get_risk_analytics)
+):
+    """Get Value at Risk (VaR)"""
+    try:
+        return risk.calculate_value_at_risk(days=days, confidence=confidence)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to calculate VaR: {str(e)}")
+
+
+@app.get("/api/v1/risk/drawdown")
+async def get_max_drawdown(
+    days: int = Query(365, le=1095),
+    risk: RiskAnalytics = Depends(get_risk_analytics)
+):
+    """Get maximum drawdown analysis"""
+    try:
+        return risk.calculate_max_drawdown(days=days)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to calculate drawdown: {str(e)}")
+
+
+@app.get("/api/v1/risk/correlation")
+async def get_correlation_matrix(
+    days: int = Query(365, le=1095),
+    min_holdings: int = Query(5, ge=2, le=20),
+    risk: RiskAnalytics = Depends(get_risk_analytics)
+):
+    """Get correlation matrix between top holdings"""
+    try:
+        return risk.calculate_correlation_matrix(days=days, min_holdings=min_holdings)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to calculate correlation: {str(e)}")
 
 
 # Error handlers

@@ -217,6 +217,30 @@ export const analyticsAPI = {
     fetchAPI(`/api/v1/analytics/contributors?days=${days}&limit=${limit}`),
 };
 
+// Risk Analytics API
+export const riskAPI = {
+  getComprehensive: (days: number = 365): Promise<any> =>
+    fetchAPI(`/api/v1/risk/comprehensive?days=${days}`),
+
+  getVolatility: (days: number = 365): Promise<any> =>
+    fetchAPI(`/api/v1/risk/volatility?days=${days}`),
+
+  getSharpeRatio: (days: number = 365): Promise<any> =>
+    fetchAPI(`/api/v1/risk/sharpe?days=${days}`),
+
+  getBeta: (days: number = 365, benchmark: string = '^GSPC'): Promise<any> =>
+    fetchAPI(`/api/v1/risk/beta?days=${days}&benchmark=${benchmark}`),
+
+  getValueAtRisk: (days: number = 365, confidence: number = 0.95): Promise<any> =>
+    fetchAPI(`/api/v1/risk/var?days=${days}&confidence=${confidence}`),
+
+  getMaxDrawdown: (days: number = 365): Promise<any> =>
+    fetchAPI(`/api/v1/risk/drawdown?days=${days}`),
+
+  getCorrelationMatrix: (days: number = 365, minHoldings: number = 5): Promise<any> =>
+    fetchAPI(`/api/v1/risk/correlation?days=${days}&min_holdings=${minHoldings}`),
+};
+
 // Health check
 export const healthAPI = {
   check: (): Promise<any> => fetchAPI('/health'),
