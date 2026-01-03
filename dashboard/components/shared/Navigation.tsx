@@ -14,6 +14,7 @@ import {
   Target,
   Lightbulb,
   Settings,
+  Database,
 } from 'lucide-react';
 
 const navigation = [
@@ -24,6 +25,7 @@ const navigation = [
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Holdings', href: '/holdings', icon: Wallet },
   { name: 'Transactions', href: '/transactions', icon: ArrowLeftRight },
+  { name: 'Import Status', href: '/import-status', icon: Database },
   { name: 'Insights', href: '/insights', icon: Lightbulb },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
