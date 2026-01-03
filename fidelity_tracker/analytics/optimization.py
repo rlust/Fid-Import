@@ -113,7 +113,7 @@ class PortfolioOptimizer:
         df = df[~df.index.duplicated(keep='last')]
 
         # Forward-fill missing values and drop any remaining NaN
-        df = df.fillna(method='ffill').dropna()
+        df = df.ffill().dropna()
 
         return df
 
