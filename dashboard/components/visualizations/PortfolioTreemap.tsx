@@ -35,14 +35,19 @@ export function PortfolioTreemap({ data, title }: PortfolioTreemapProps) {
     id: item.id || `${item.name}-${index}-${item.size}`,
   }));
 
+  // Create a lookup map for portfolio weights by name
+  const weightMap = new Map(data.map(item => [item.name, item.value || 0]));
+
   const CustomizedContent = (props: any) => {
-    const { x, y, width, height, index, name, size, value } = props;
+    const { x, y, width, height, index, name } = props;
 
     if (width < 50 || height < 30) {
       return null; // Don't render if too small
     }
 
-    const percentage = value ? (value * 100).toFixed(1) : '0.0';
+    // Look up the portfolio weight from our map
+    const portfolioWeight = weightMap.get(name) || 0;
+    const percentage = (portfolioWeight * 100).toFixed(1);
 
     return (
       <g>
@@ -84,14 +89,15 @@ export function PortfolioTreemap({ data, title }: PortfolioTreemapProps) {
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const portfolioWeight = weightMap.get(data.name) || 0;
       return (
-        <div className="bg-white px-4 py-2 border border-gray-200 rounded shadow-lg">
-          <p className="font-semibold text-gray-900">{data.name}</p>
+        <div className="bg-white dark:bg-gray-800 px-4 py-2 border border-gray-200 dark:border-gray-600 rounded shadow-lg">
+          <p className="font-semibold text-gray-900 dark:text-white">{data.name}</p>
           {data.sector && (
-            <p className="text-sm text-gray-600">Sector: {data.sector}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Sector: {data.sector}</p>
           )}
-          <p className="text-sm text-gray-600">
-            ${data.size?.toLocaleString()} ({(data.value * 100).toFixed(2)}%)
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            ${data.size?.toLocaleString()} ({(portfolioWeight * 100).toFixed(2)}%)
           </p>
         </div>
       );
@@ -100,9 +106,9 @@ export function PortfolioTreemap({ data, title }: PortfolioTreemapProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
       {title && (
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{title}</h3>
       )}
       <ResponsiveContainer width="100%" height={400}>
         <Treemap
