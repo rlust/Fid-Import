@@ -104,10 +104,10 @@ export default function DashboardPage() {
             {topHoldings.map((holding, index) => (
               <div
                 key={`${holding.symbol}-${holding.value}-${index}`}
-                className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0 gap-2"
               >
                 <div className="flex-1">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3">
                     <div className="font-semibold text-gray-900 dark:text-white">{holding.symbol}</div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">{holding.company_name}</div>
                   </div>
@@ -115,7 +115,7 @@ export default function DashboardPage() {
                     {holding.quantity} shares @ {formatCurrency(holding.last_price)}
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-left sm:text-right">
                   <div className="font-semibold text-gray-900 dark:text-white">
                     {formatCurrency(holding.value)}
                   </div>

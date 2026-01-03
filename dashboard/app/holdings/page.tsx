@@ -142,7 +142,7 @@ export default function HoldingsPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Holdings</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
@@ -150,13 +150,16 @@ export default function HoldingsPage() {
           </p>
         </div>
         {!isLoading && holdings && holdings.length > 0 && (
-          <button
-            onClick={exportToCSV}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Download className="h-4 w-4" />
-            <span>Export CSV</span>
-          </button>
+          <div className="flex-shrink-0">
+            <button
+              onClick={exportToCSV}
+              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              title="Export holdings to CSV"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Export CSV</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -305,7 +308,7 @@ export default function HoldingsPage() {
                       {formatPercent(holding.portfolio_weight)}
                     </td>
                     <td className={`py-3 px-4 text-right text-sm font-medium ${
-                      (holding.unrealized_gain_loss || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                      (holding.unrealized_gain_loss || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                     }`}>
                       {formatCurrency(holding.unrealized_gain_loss)}
                       <div className="text-xs">
