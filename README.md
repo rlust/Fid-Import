@@ -210,12 +210,42 @@ grok/
 └── fidelity_holdings_enriched_*.csv # Enriched holdings
 ```
 
+## Fidelity CSV Import (NEW!)
+
+### What is it?
+
+Import sector and company data directly from Fidelity portfolio CSV exports to prepopulate the ticker metadata cache. This makes enrichment **much faster** and avoids Yahoo Finance rate limiting.
+
+### Quick Start
+
+1. **Export CSV from Fidelity**: Accounts & Trade → Portfolio → Download
+2. **Import the CSV**:
+
+   ```bash
+   portfolio-tracker import-fidelity-csv ~/Downloads/Portfolio_Positions_Jan-04-2026.csv
+   ```
+
+3. **Benefit**: Future enrichment operations will use cached data instead of Yahoo Finance API
+
+### Benefits
+
+- ✅ **Instant enrichment** for cached tickers (no 3-second API delays)
+- ✅ **Avoid rate limiting** (fewer Yahoo Finance API calls)
+- ✅ **Accurate sector data** from Fidelity
+- ✅ **Automatic tracking** with alerts when cache needs updating
+
+### Documentation
+
+See [docs/FIDELITY_CSV_IMPORT.md](docs/FIDELITY_CSV_IMPORT.md) for detailed guide.
+
 ## Version History
 
-- **v1.0** - Initial release with basic data collection
-- **v1.1** - Added portfolio weights and account weights
-- **v1.2** - Added Yahoo Finance enrichment with rate limiting
+- **v3.0** - Added Fidelity CSV import & persistent ticker metadata cache (2026-01-04)
+- **v2.0** - Added CLI tool, performance tracking, database migrations
 - **v1.3** - Split into fast import + optional enrichment
+- **v1.2** - Added Yahoo Finance enrichment with rate limiting
+- **v1.1** - Added portfolio weights and account weights
+- **v1.0** - Initial release with basic data collection
 
 ## Support
 

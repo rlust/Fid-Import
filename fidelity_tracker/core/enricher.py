@@ -59,19 +59,24 @@ class DataEnricher:
         if db:
             cached_metadata = db.get_ticker_metadata(ticker_clean)
             if cached_metadata and not db.is_metadata_stale(cached_metadata, max_age_days=30):
-                logger.debug(f"Using persistent cached data for {ticker_clean} (age: {cached_metadata.get('last_updated')})")
-                # Convert database format to enricher format
-                stock_info = {
-                    'company_name': cached_metadata.get('company_name', ticker_clean),
-                    'sector': cached_metadata.get('sector', 'Unknown'),
-                    'industry': cached_metadata.get('industry', 'Unknown'),
-                    'market_cap': cached_metadata.get('market_cap'),
-                    'pe_ratio': cached_metadata.get('pe_ratio'),
-                    'dividend_yield': cached_metadata.get('dividend_yield')
-                }
-                # Also cache in memory for this session
-                self._cache[ticker_clean] = stock_info
-                return stock_info
+                # Skip cache if sector is Unknown - we want to fetch proper data from Yahoo Finance
+                cached_sector = cached_metadata.get('sector', 'Unknown')
+                if cached_sector and cached_sector != 'Unknown':
+                    logger.debug(f"Using persistent cached data for {ticker_clean} (age: {cached_metadata.get('last_updated')})")
+                    # Convert database format to enricher format
+                    stock_info = {
+                        'company_name': cached_metadata.get('company_name', ticker_clean),
+                        'sector': cached_sector,
+                        'industry': cached_metadata.get('industry', 'Unknown'),
+                        'market_cap': cached_metadata.get('market_cap'),
+                        'pe_ratio': cached_metadata.get('pe_ratio'),
+                        'dividend_yield': cached_metadata.get('dividend_yield')
+                    }
+                    # Also cache in memory for this session
+                    self._cache[ticker_clean] = stock_info
+                    return stock_info
+                else:
+                    logger.debug(f"Cached data for {ticker_clean} has Unknown sector, fetching from Yahoo Finance")
 
         # Fetch from Yahoo Finance with retry logic
         for attempt in range(self.max_retries):

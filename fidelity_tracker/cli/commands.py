@@ -126,9 +126,39 @@ def setup(ctx):
 def sync(ctx, enrich):
     """Pull data from Fidelity"""
     from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
+    import json
+    import sqlite3
     config = ctx.obj['config']
 
     console.print("[bold blue]Syncing portfolio data...[/bold blue]\n")
+
+    # Check if Fidelity CSV cache needs updating
+    try:
+        db_path = config.get('database.path', 'fidelity_portfolio.db')
+        if Path(db_path).exists():
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM user_preferences WHERE key = 'last_fidelity_csv_import'")
+            result = cursor.fetchone()
+            conn.close()
+
+            if result:
+                last_import = datetime.fromisoformat(json.loads(result['value']))
+                days_ago = (datetime.now() - last_import).days
+
+                if days_ago > 30:
+                    console.print(f"[yellow]⚠ Cache notice: Fidelity CSV data is {days_ago} days old[/yellow]")
+                    console.print("[yellow]  Consider re-importing: portfolio-tracker import-fidelity-csv <csv_file>[/yellow]\n")
+            else:
+                # No import recorded, check if cache has fidelity_csv data
+                db = DatabaseManager(db_path)
+                stats = db.get_metadata_stats()
+                if stats.get('by_data_source', {}).get('fidelity_csv', 0) == 0:
+                    console.print("[yellow]💡 Tip: Import Fidelity CSV to pre-populate sector data and speed up enrichment[/yellow]")
+                    console.print("[yellow]   Use: portfolio-tracker import-fidelity-csv <csv_file>[/yellow]\n")
+    except Exception:
+        pass
 
     start_time = datetime.now()
 
@@ -773,28 +803,238 @@ def logs(ctx, tail, follow, level):
 @click.pass_context
 def cache(ctx):
     """Show enrichment cache information"""
-    console.print("[bold blue]Enrichment Cache[/bold blue]\n")
+    config = ctx.obj['config']
+    db_path = config.get('database.path', 'fidelity_portfolio.db')
 
-    # Create enricher to access cache
-    enricher = DataEnricher()
+    console.print("[bold blue]Ticker Metadata Cache[/bold blue]\n")
 
-    # Try to load cache from previous runs (cache is in-memory, so this will be empty)
-    cache_stats = enricher.get_cache_stats()
+    # Get persistent cache statistics
+    db = DatabaseManager(db_path)
+    cache_stats = db.get_metadata_stats()
 
-    console.print(f"[bold]Cache Statistics[/bold]")
-    console.print(f"  Cached Tickers: {cache_stats['cached_tickers']}")
-    console.print(f"  Cache Size: {cache_stats['cache_size_bytes']} bytes")
+    console.print(f"[bold]Persistent Cache Statistics[/bold]")
+    console.print(f"  Total Tickers: {cache_stats['total_tickers']}")
+    console.print(f"  Average Updates: {cache_stats['avg_update_count']}")
 
-    if cache_stats['cached_tickers'] > 0:
-        console.print(f"\n[bold]Cached Tickers[/bold]")
-        for ticker in cache_stats['tickers'][:20]:  # Show first 20
-            console.print(f"  • {ticker}")
-        if len(cache_stats['tickers']) > 20:
-            console.print(f"  ... and {len(cache_stats['tickers']) - 20} more")
-    else:
-        console.print("\n[yellow]No cached data. Run enrichment to populate cache.[/yellow]")
+    if cache_stats['by_sector']:
+        console.print(f"\n[bold]Tickers by Sector[/bold]")
+        for sector, count in sorted(cache_stats['by_sector'].items(), key=lambda x: x[1], reverse=True)[:10]:
+            console.print(f"  {sector:30s} {count:>5}")
 
-    console.print("\n[dim]Note: Cache is cleared between runs. Use --clear-cache flag with enrich command to force refresh.[/dim]")
+    if cache_stats['by_data_source']:
+        console.print(f"\n[bold]Data Sources[/bold]")
+        for source, count in cache_stats['by_data_source'].items():
+            console.print(f"  {source:30s} {count:>5}")
+
+    # Check last Fidelity CSV import
+    try:
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM user_preferences WHERE key = 'last_fidelity_csv_import'")
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            import json
+            last_import = json.loads(result['value'])
+            console.print(f"\n[bold]Last Fidelity CSV Import[/bold]")
+            console.print(f"  Date: {last_import}")
+
+            # Calculate days since import
+            from datetime import datetime
+            import_date = datetime.fromisoformat(last_import)
+            days_ago = (datetime.now() - import_date).days
+
+            if days_ago > 30:
+                console.print(f"  [yellow]⚠ {days_ago} days ago - Consider re-importing[/yellow]")
+            else:
+                console.print(f"  [green]✓ {days_ago} days ago[/green]")
+    except Exception:
+        pass
+
+    if cache_stats['total_tickers'] == 0:
+        console.print("\n[yellow]No cached data. Import Fidelity CSV or run enrichment to populate cache.[/yellow]")
+        console.print("\nUse: [bold]portfolio-tracker import-fidelity-csv <csv_file>[/bold]")
+
+    console.print("\n[dim]Persistent cache speeds up enrichment by avoiding Yahoo Finance API calls.[/dim]")
+
+
+@cli.command()
+@click.argument('csv_file', type=click.Path(exists=True))
+@click.option('--show-stats/--no-stats', default=True, help='Show cache statistics after import')
+@click.pass_context
+def import_fidelity_csv(ctx, csv_file, show_stats):
+    """Import Fidelity portfolio CSV to prepopulate ticker metadata cache
+
+    This command imports sector, industry, and company data from a Fidelity
+    portfolio export CSV file. The data is saved to the persistent cache,
+    which speeds up future enrichment operations by avoiding Yahoo Finance API calls.
+
+    Example:
+        portfolio-tracker import-fidelity-csv ~/Downloads/Portfolio_Positions_Jan-04-2026.csv
+    """
+    config = ctx.obj['config']
+    db_path = config.get('database.path', 'fidelity_portfolio.db')
+
+    console.print(f"[bold blue]Importing Fidelity CSV...[/bold blue]\n")
+    console.print(f"File: {csv_file}")
+    console.print(f"Database: {db_path}\n")
+
+    # Ensure database is migrated to v3 (has ticker_metadata table)
+    migrator = MigrationManager(db_path)
+    current_version = migrator.get_current_version()
+
+    if current_version < 3:
+        console.print(f"[yellow]Database at version {current_version}, migrating to v3...[/yellow]")
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Running migration...", total=None)
+            migrator.migrate(target_version=3)
+            progress.update(task, completed=True)
+        console.print("[green]✓ Migration complete[/green]\n")
+
+    # Import CSV data
+    import csv as csv_module
+    import json
+    from pathlib import Path
+
+    db = DatabaseManager(db_path)
+
+    stats = {
+        'total_rows': 0,
+        'tickers_saved': 0,
+        'skipped': 0,
+        'errors': 0
+    }
+
+    try:
+        with open(csv_file, 'r', encoding='utf-8-sig') as f:
+            reader = csv_module.DictReader(f)
+
+            unique_tickers = set()
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                task = progress.add_task("Importing tickers...", total=None)
+
+                for row in reader:
+                    if not row:
+                        continue
+
+                    stats['total_rows'] += 1
+
+                    ticker = row.get('Symbol', '').strip() if row.get('Symbol') else ''
+
+                    if not ticker or ticker == 'N/A' or ticker in unique_tickers:
+                        stats['skipped'] += 1
+                        continue
+
+                    unique_tickers.add(ticker)
+
+                    try:
+                        # Extract data from CSV
+                        description = row.get('Description', '').strip()
+                        sector = row.get('Sector', '').strip()
+                        industry = row.get('Industry', '').strip()
+                        security_type = row.get('Security type', '').strip()
+
+                        # Check if cash/money market fund
+                        is_cash = security_type in ['Core', 'Mutual Fund', 'Annuity'] or \
+                                 ticker in ['FZDXX', 'FDRXX', 'SPAXX', 'SPRXX', 'FDLXX', 'FZFXX']
+
+                        if is_cash and (not sector or sector == '--'):
+                            sector = 'Cash'
+                            industry = 'Money Market'
+
+                        # Parse market cap
+                        market_cap_str = row.get('Market cap', '').strip()
+                        market_cap = None
+                        if market_cap_str and '($' in market_cap_str:
+                            try:
+                                value_str = market_cap_str.split('($')[1].split(')')[0].replace('$', '').replace(',', '')
+                                multiplier = 1_000_000_000 if value_str.endswith('B') else (1_000_000 if value_str.endswith('M') else 1)
+                                if value_str[-1] in 'BMK':
+                                    value_str = value_str[:-1]
+                                market_cap = float(value_str) * multiplier
+                            except (ValueError, IndexError):
+                                pass
+
+                        # Parse P/E ratio
+                        pe_ratio_str = row.get('P/E ratio', '').strip()
+                        pe_ratio = None
+                        if pe_ratio_str and pe_ratio_str != '--':
+                            try:
+                                pe_ratio = float(pe_ratio_str)
+                            except ValueError:
+                                pass
+
+                        # Parse dividend yield
+                        dividend_yield = None
+                        sec_yield = row.get('SEC yield', '').strip()
+                        if sec_yield and sec_yield != '--':
+                            try:
+                                dividend_yield = float(sec_yield.replace('%', '')) / 100
+                            except ValueError:
+                                pass
+
+                        # Save to database
+                        metadata = {
+                            'company_name': description or ticker,
+                            'sector': sector if sector and sector != '--' else 'Unknown',
+                            'industry': industry if industry and industry != '--' else 'Unknown',
+                            'market_cap': market_cap,
+                            'pe_ratio': pe_ratio,
+                            'dividend_yield': dividend_yield,
+                            'data_source': 'fidelity_csv'
+                        }
+
+                        db.save_ticker_metadata(ticker, metadata)
+                        stats['tickers_saved'] += 1
+
+                        progress.update(task, description=f"Imported {stats['tickers_saved']} tickers ({ticker})")
+
+                    except Exception as e:
+                        logger.error(f"Error processing {ticker}: {e}")
+                        stats['errors'] += 1
+
+                progress.update(task, description="✓ Import complete")
+
+        # Save import timestamp to preferences
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT OR REPLACE INTO user_preferences (key, value, updated_at)
+            VALUES ('last_fidelity_csv_import', ?, CURRENT_TIMESTAMP)
+        ''', (json.dumps(datetime.now().isoformat()),))
+        conn.commit()
+        conn.close()
+
+        # Print summary
+        console.print(f"\n[green]✓ Import complete![/green]")
+        console.print(f"  CSV Rows: {stats['total_rows']}")
+        console.print(f"  Tickers Imported: {stats['tickers_saved']}")
+        console.print(f"  Skipped: {stats['skipped']}")
+        if stats['errors'] > 0:
+            console.print(f"  [yellow]Errors: {stats['errors']}[/yellow]")
+
+        # Show cache statistics
+        if show_stats:
+            console.print("")
+            ctx.invoke(cache)
+
+    except Exception as e:
+        logger.exception("CSV import failed")
+        console.print(f"\n[red]✗ Import failed: {e}[/red]")
+        raise click.Abort()
 
 
 @cli.command()
