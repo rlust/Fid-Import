@@ -288,6 +288,56 @@ class MigrationManager:
         finally:
             conn.close()
 
+    def migrate_to_v3(self) -> None:
+        """
+        Migrate to version 3: Add sector data caching
+
+        New tables:
+        - ticker_metadata: Persistent cache for Yahoo Finance ticker data
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            logger.info("Starting migration to version 3...")
+
+            # Create ticker_metadata table
+            logger.info("Creating ticker_metadata table...")
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS ticker_metadata (
+                    ticker TEXT PRIMARY KEY,
+                    company_name TEXT,
+                    sector TEXT,
+                    industry TEXT,
+                    market_cap REAL,
+                    pe_ratio REAL,
+                    dividend_yield REAL,
+                    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    update_count INTEGER DEFAULT 1,
+                    data_source TEXT DEFAULT 'yahoo_finance'
+                )
+            ''')
+
+            # Create indexes for efficient querying
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_ticker_metadata_updated ON ticker_metadata(last_updated)')
+            cursor.execute('CREATE INDEX IF NOT EXISTS idx_ticker_metadata_sector ON ticker_metadata(sector)')
+
+            # Record migration
+            cursor.execute(
+                'INSERT INTO schema_version (version, applied_at, description) VALUES (?, ?, ?)',
+                (3, datetime.now().isoformat(), 'Add sector data caching')
+            )
+
+            conn.commit()
+            logger.success("Successfully migrated to version 3")
+
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Migration to v3 failed: {e}")
+            raise
+        finally:
+            conn.close()
+
     def migrate(self, target_version: Optional[int] = None) -> None:
         """
         Run migrations to target version (or latest if not specified)
@@ -296,7 +346,7 @@ class MigrationManager:
             target_version: Target schema version (default: latest)
         """
         current_version = self.get_current_version()
-        latest_version = 2  # Update this as we add more migrations
+        latest_version = 3  # Update this as we add more migrations
 
         if target_version is None:
             target_version = latest_version
@@ -310,6 +360,9 @@ class MigrationManager:
         # Run migrations in order
         if current_version < 2 <= target_version:
             self.migrate_to_v2()
+
+        if current_version < 3 <= target_version:
+            self.migrate_to_v3()
 
         logger.success(f"Database migration complete. Current version: {self.get_current_version()}")
 

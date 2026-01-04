@@ -242,7 +242,8 @@ async def get_sector_allocation(db: DatabaseManager = Depends(get_db)):
     sectors: Dict[str, float] = {}
     for holding in holdings:
         sector = holding.get('sector', 'Unknown')
-        if sector not in ['Unknown', 'Cash']:
+        # Include all sectors (Unknown, Cash, etc.) for transparency
+        if sector:  # Only skip empty/null sectors
             sectors[sector] = sectors.get(sector, 0) + holding.get('value', 0)
 
     total_value = latest['total_value']

@@ -26,12 +26,13 @@ class DataEnricher:
         self.progress_callback = progress_callback
         self._cache = {}  # Cache ticker data to avoid duplicate calls
 
-    def enrich_ticker(self, ticker: str) -> Dict[str, Any]:
+    def enrich_ticker(self, ticker: str, db: Optional[Any] = None) -> Dict[str, Any]:
         """
         Fetch enrichment data for a single ticker
 
         Args:
             ticker: Stock ticker symbol
+            db: Optional DatabaseManager instance for persistent caching
 
         Returns:
             Dictionary with company information
@@ -49,10 +50,28 @@ class DataEnricher:
                 'dividend_yield': None
             }
 
-        # Check cache
+        # Check in-memory cache first (fastest)
         if ticker_clean in self._cache:
-            logger.debug(f"Using cached data for {ticker_clean}")
+            logger.debug(f"Using in-memory cached data for {ticker_clean}")
             return self._cache[ticker_clean]
+
+        # Check persistent cache (database) if available
+        if db:
+            cached_metadata = db.get_ticker_metadata(ticker_clean)
+            if cached_metadata and not db.is_metadata_stale(cached_metadata, max_age_days=30):
+                logger.debug(f"Using persistent cached data for {ticker_clean} (age: {cached_metadata.get('last_updated')})")
+                # Convert database format to enricher format
+                stock_info = {
+                    'company_name': cached_metadata.get('company_name', ticker_clean),
+                    'sector': cached_metadata.get('sector', 'Unknown'),
+                    'industry': cached_metadata.get('industry', 'Unknown'),
+                    'market_cap': cached_metadata.get('market_cap'),
+                    'pe_ratio': cached_metadata.get('pe_ratio'),
+                    'dividend_yield': cached_metadata.get('dividend_yield')
+                }
+                # Also cache in memory for this session
+                self._cache[ticker_clean] = stock_info
+                return stock_info
 
         # Fetch from Yahoo Finance with retry logic
         for attempt in range(self.max_retries):
@@ -70,8 +89,14 @@ class DataEnricher:
                     'dividend_yield': info.get('dividendYield')
                 }
 
-                # Cache the result
+                # Cache the result in memory
                 self._cache[ticker_clean] = stock_info
+
+                # Save to persistent cache if available
+                if db:
+                    db.save_ticker_metadata(ticker_clean, stock_info)
+                    logger.debug(f"Saved {ticker_clean} to persistent cache")
+
                 logger.success(f"✓ {ticker_clean}: {stock_info['company_name']}")
 
                 sleep(self.delay)
@@ -101,13 +126,14 @@ class DataEnricher:
         self._cache[ticker_clean] = default_info
         return default_info
 
-    def enrich_accounts(self, accounts: Dict[str, Any], total_portfolio_value: float) -> Dict[str, Any]:
+    def enrich_accounts(self, accounts: Dict[str, Any], total_portfolio_value: float, db: Optional[Any] = None) -> Dict[str, Any]:
         """
         Enrich all accounts with Yahoo Finance data
 
         Args:
             accounts: Dictionary of account data
             total_portfolio_value: Total portfolio value for weight calculations
+            db: Optional DatabaseManager instance for persistent caching
 
         Returns:
             Enriched accounts dictionary
@@ -130,7 +156,7 @@ class DataEnricher:
             if self.progress_callback:
                 self.progress_callback(i, len(unique_tickers), ticker)
 
-            self.enrich_ticker(ticker)
+            self.enrich_ticker(ticker, db=db)
 
         # Apply enrichment data to all holdings
         for account_id, account_data in accounts.items():
@@ -173,12 +199,13 @@ class DataEnricher:
         logger.success(f"Enrichment complete! Processed {len(unique_tickers)} tickers")
         return accounts
 
-    def enrich_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def enrich_data(self, data: Dict[str, Any], db: Optional[Any] = None) -> Dict[str, Any]:
         """
         Enrich complete dataset
 
         Args:
             data: Dictionary containing accounts and other data
+            db: Optional DatabaseManager instance for persistent caching
 
         Returns:
             Enriched data dictionary
@@ -186,7 +213,7 @@ class DataEnricher:
         accounts = data.get('accounts', {})
         total_portfolio_value = sum(account.get('balance', 0) for account in accounts.values())
 
-        data['accounts'] = self.enrich_accounts(accounts, total_portfolio_value)
+        data['accounts'] = self.enrich_accounts(accounts, total_portfolio_value, db=db)
         return data
 
     def _should_skip_ticker(self, ticker: str) -> bool:

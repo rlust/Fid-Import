@@ -239,7 +239,8 @@ def main():
             if 'sector' in df.columns:
                 st.markdown("**By Sector**")
                 sector_data = df.groupby('sector')['value'].sum().reset_index()
-                sector_data = sector_data[sector_data['sector'] != 'Unknown']
+                # Show all sectors including Unknown for transparency
+                # sector_data = sector_data[sector_data['sector'] != 'Unknown']
 
                 if not sector_data.empty:
                     fig_sector = px.pie(

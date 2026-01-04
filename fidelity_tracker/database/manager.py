@@ -297,3 +297,189 @@ class DatabaseManager:
             logger.info("Database optimized")
         finally:
             conn.close()
+
+    # Ticker Metadata Cache Methods (V3 Migration)
+
+    def get_ticker_metadata(self, ticker: str) -> Optional[Dict[str, Any]]:
+        """
+        Get cached metadata for a ticker
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            Dictionary with ticker metadata or None if not found
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute(
+                'SELECT * FROM ticker_metadata WHERE ticker = ?',
+                (ticker.upper(),)
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        except sqlite3.OperationalError as e:
+            # Table doesn't exist (pre-migration v3)
+            if 'no such table' in str(e).lower():
+                logger.debug("ticker_metadata table doesn't exist yet (run migration)")
+                return None
+            raise
+        finally:
+            conn.close()
+
+    def save_ticker_metadata(self, ticker: str, data: Dict[str, Any]) -> None:
+        """
+        Save or update ticker metadata in cache
+
+        Args:
+            ticker: Stock ticker symbol
+            data: Dictionary with ticker metadata (sector, industry, market_cap, etc.)
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            ticker_upper = ticker.upper()
+
+            # Check if ticker exists to determine insert vs update
+            cursor.execute('SELECT update_count FROM ticker_metadata WHERE ticker = ?', (ticker_upper,))
+            existing = cursor.fetchone()
+
+            if existing:
+                # Update existing record
+                cursor.execute('''
+                    UPDATE ticker_metadata
+                    SET company_name = ?,
+                        sector = ?,
+                        industry = ?,
+                        market_cap = ?,
+                        pe_ratio = ?,
+                        dividend_yield = ?,
+                        last_updated = CURRENT_TIMESTAMP,
+                        update_count = update_count + 1,
+                        data_source = ?
+                    WHERE ticker = ?
+                ''', (
+                    data.get('company_name'),
+                    data.get('sector'),
+                    data.get('industry'),
+                    data.get('market_cap'),
+                    data.get('pe_ratio'),
+                    data.get('dividend_yield'),
+                    data.get('data_source', 'yahoo_finance'),
+                    ticker_upper
+                ))
+            else:
+                # Insert new record
+                cursor.execute('''
+                    INSERT INTO ticker_metadata (
+                        ticker, company_name, sector, industry,
+                        market_cap, pe_ratio, dividend_yield, data_source
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    ticker_upper,
+                    data.get('company_name'),
+                    data.get('sector'),
+                    data.get('industry'),
+                    data.get('market_cap'),
+                    data.get('pe_ratio'),
+                    data.get('dividend_yield'),
+                    data.get('data_source', 'yahoo_finance')
+                ))
+
+            conn.commit()
+            logger.debug(f"Saved metadata for {ticker_upper} to cache")
+
+        except sqlite3.OperationalError as e:
+            # Table doesn't exist (pre-migration v3)
+            if 'no such table' in str(e).lower():
+                logger.debug("ticker_metadata table doesn't exist yet (run migration)")
+                return
+            raise
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Failed to save ticker metadata: {e}")
+            raise
+        finally:
+            conn.close()
+
+    def is_metadata_stale(self, metadata: Dict[str, Any], max_age_days: int = 30) -> bool:
+        """
+        Check if cached metadata is stale (older than max_age_days)
+
+        Args:
+            metadata: Ticker metadata dictionary with 'last_updated' field
+            max_age_days: Maximum age in days before considering stale
+
+        Returns:
+            True if stale or missing last_updated, False otherwise
+        """
+        if not metadata or 'last_updated' not in metadata:
+            return True
+
+        try:
+            last_updated = datetime.fromisoformat(metadata['last_updated'])
+            age_days = (datetime.now() - last_updated).days
+            return age_days > max_age_days
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid last_updated timestamp: {metadata.get('last_updated')}")
+            return True
+
+    def get_metadata_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about the ticker metadata cache
+
+        Returns:
+            Dictionary with cache statistics
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            stats = {
+                'total_tickers': 0,
+                'by_sector': {},
+                'by_data_source': {},
+                'avg_update_count': 0
+            }
+
+            # Total tickers
+            cursor.execute('SELECT COUNT(*) as count FROM ticker_metadata')
+            stats['total_tickers'] = cursor.fetchone()['count']
+
+            # By sector
+            cursor.execute('''
+                SELECT sector, COUNT(*) as count
+                FROM ticker_metadata
+                WHERE sector IS NOT NULL
+                GROUP BY sector
+                ORDER BY count DESC
+            ''')
+            stats['by_sector'] = {row['sector']: row['count'] for row in cursor.fetchall()}
+
+            # By data source
+            cursor.execute('''
+                SELECT data_source, COUNT(*) as count
+                FROM ticker_metadata
+                GROUP BY data_source
+            ''')
+            stats['by_data_source'] = {row['data_source']: row['count'] for row in cursor.fetchall()}
+
+            # Average update count
+            cursor.execute('SELECT AVG(update_count) as avg FROM ticker_metadata')
+            avg_row = cursor.fetchone()
+            stats['avg_update_count'] = round(avg_row['avg'], 2) if avg_row['avg'] else 0
+
+            return stats
+
+        except sqlite3.OperationalError as e:
+            # Table doesn't exist (pre-migration v3)
+            if 'no such table' in str(e).lower():
+                logger.debug("ticker_metadata table doesn't exist yet (run migration)")
+                return {'total_tickers': 0, 'by_sector': {}, 'by_data_source': {}, 'avg_update_count': 0}
+            raise
+        finally:
+            conn.close()

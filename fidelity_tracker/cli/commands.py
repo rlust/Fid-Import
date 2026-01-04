@@ -186,8 +186,11 @@ def sync(ctx, enrich):
                     progress_callback=progress_callback
                 )
 
+                # Initialize database for persistent caching
+                db_for_cache = DatabaseManager(config.get('database.path', 'fidelity_portfolio.db'))
+
                 try:
-                    data = enricher.enrich_data(data)
+                    data = enricher.enrich_data(data, db=db_for_cache)
                     progress.update(enrichment_task, description="✓ Enrichment complete")
                 except Exception as e:
                     progress.update(enrichment_task, description="✗ Enrichment failed")
@@ -289,12 +292,15 @@ def enrich(ctx, json_file, delay, clear_cache):
             progress_callback=progress_callback
         )
 
+        # Initialize database for persistent caching
+        db_for_cache = DatabaseManager(config.get('database.path', 'fidelity_portfolio.db'))
+
         if clear_cache:
             enricher.clear_cache()
-            console.print("[yellow]Cache cleared[/yellow]")
+            console.print("[yellow]In-memory cache cleared[/yellow]")
 
         try:
-            data = enricher.enrich_data(data)
+            data = enricher.enrich_data(data, db=db_for_cache)
             progress.update(enrichment_task, description="✓ Enrichment complete")
         except Exception as e:
             progress.update(enrichment_task, description="✗ Enrichment failed")
@@ -357,7 +363,8 @@ def status(ctx, limit, detailed):
                 sectors = {}
                 for holding in holdings:
                     sector = holding.get('sector', 'Unknown')
-                    if sector not in ['Unknown', 'Cash']:
+                    # Include all sectors (Unknown, Cash, etc.) for transparency
+                    if sector:  # Only skip empty/null sectors
                         sectors[sector] = sectors.get(sector, 0) + holding.get('value', 0)
 
                 for sector, value in sorted(sectors.items(), key=lambda x: x[1], reverse=True)[:5]:
