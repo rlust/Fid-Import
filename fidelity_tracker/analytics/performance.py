@@ -76,10 +76,12 @@ class PerformanceAnalytics:
             end_value = end_snap['total_value']
 
             # Find cash flows in this period
+            # BUY = positive (money invested), SELL = negative (money withdrawn)
             period_cash_flows = sum(
-                t['total_amount'] for t in transactions
+                t['total_amount'] if t['transaction_type'].upper() == 'BUY' else -t['total_amount']
+                for t in transactions
                 if start_snap['timestamp'] <= t['transaction_date'] < end_snap['timestamp']
-                and t['transaction_type'] in ['BUY', 'SELL']
+                and t['transaction_type'].upper() in ['BUY', 'SELL']
             )
 
             if start_value == 0:
@@ -223,10 +225,17 @@ class PerformanceAnalytics:
             start_value = snapshots[0]['total_value']
             end_value = snapshots[-1]['total_value']
 
+            # Calculate net cash flows: BUY = positive (invested), SELL = negative (withdrawn)
+            net_cash_flows = sum(
+                t['total_amount'] if t['transaction_type'].upper() == 'BUY' else -t['total_amount']
+                for t in transactions
+                if t['transaction_type'].upper() in ['BUY', 'SELL']
+            )
+
             simple_return = self.calculate_simple_return(
                 start_value,
                 end_value,
-                sum(t['total_amount'] for t in transactions if t['transaction_type'] in ['BUY', 'SELL'])
+                net_cash_flows
             )
 
             twr_result = self.calculate_twr(snapshots, transactions)
