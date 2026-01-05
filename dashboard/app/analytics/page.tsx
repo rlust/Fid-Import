@@ -23,7 +23,7 @@ export default function AnalyticsPage() {
   // Transform sectors for pie chart
   const sectorPieData = sectors?.map((sector) => ({
     name: sector.sector,
-    value: sector.total_value || 0,
+    value: sector.value || 0,
     percentage: sector.percentage || 0,
   })) || [];
 
