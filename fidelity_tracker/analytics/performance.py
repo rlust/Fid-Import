@@ -142,7 +142,7 @@ class PerformanceAnalytics:
             t_date = datetime.fromisoformat(t['transaction_date'])
             if start_date < t_date < end_date:
                 # Buys are negative (money out), sells are positive (money in)
-                amount = -t['total_amount'] if t['transaction_type'] == 'BUY' else t['total_amount']
+                amount = -t['total_amount'] if t['transaction_type'].upper() == 'BUY' else t['total_amount']
                 cash_flows.append(amount)
                 dates.append(t_date)
 
