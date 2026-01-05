@@ -45,3 +45,11 @@ export function useTopContributors(days: number = 30, limit: number = 10) {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+export function usePerformanceHistory(days: number = 365) {
+  return useQuery({
+    queryKey: ['performance-history', days],
+    queryFn: () => analyticsAPI.getPerformanceHistory(days),
+    staleTime: 5 * 60 * 1000,
+  });
+}

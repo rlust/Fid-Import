@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useComprehensiveRisk } from '@/hooks/useRisk';
-import { usePerformance, useTopContributors, useSectorAttribution } from '@/hooks/usePerformance';
+import { usePerformance, useTopContributors, useSectorAttribution, usePerformanceHistory } from '@/hooks/usePerformance';
 import { useSectorAllocation } from '@/hooks/usePortfolio';
 import { PeriodSelector } from '@/components/shared/PeriodSelector';
 import { MetricCard } from '@/components/shared/MetricCard';
 import { SectorPieChart } from '@/components/visualizations/SectorPieChart';
 import { CorrelationHeatmap } from '@/components/visualizations/CorrelationHeatmap';
+import { InteractivePerformanceChart } from '@/components/visualizations/InteractivePerformanceChart';
 import { formatPercent, formatCurrency } from '@/lib/formatters';
 import { TrendingUp, Target, Shield, AlertTriangle, PieChart as PieChartIcon, Download } from 'lucide-react';
 
@@ -19,12 +20,20 @@ export default function AnalyticsPage() {
   const { data: contributors, isLoading: contribLoading } = useTopContributors(Math.min(days, 30));
   const { data: sectorAttribution, isLoading: sectorLoading } = useSectorAttribution(Math.min(days, 30));
   const { data: sectors, isLoading: sectorsLoading } = useSectorAllocation();
+  const { data: performanceHistory, isLoading: historyLoading } = usePerformanceHistory(days);
 
   // Transform sectors for pie chart
   const sectorPieData = sectors?.map((sector) => ({
     name: sector.sector,
     value: sector.value || 0,
     percentage: sector.percentage || 0,
+  })) || [];
+
+  // Transform performance history for chart
+  const chartData = performanceHistory?.history?.map((point: any) => ({
+    date: point.timestamp,
+    value: point.total_value,
+    return: point.cumulative_return_percent,
   })) || [];
 
   const isLoading = riskLoading || perfLoading;
@@ -189,6 +198,16 @@ export default function AnalyticsPage() {
           </div>
         )}
       </div>
+
+      {/* Portfolio Performance History */}
+      {!historyLoading && chartData.length > 0 && (
+        <InteractivePerformanceChart
+          data={chartData}
+          title="Portfolio Value Over Time"
+          showReturns={true}
+          height={450}
+        />
+      )}
 
       {/* Sector Allocation */}
       {!sectorsLoading && sectorPieData.length > 0 && (

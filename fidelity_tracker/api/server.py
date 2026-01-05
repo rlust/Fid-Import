@@ -703,6 +703,55 @@ async def get_performance_metrics(
         raise HTTPException(status_code=500, detail=f"Failed to calculate performance: {str(e)}")
 
 
+@app.get("/api/v1/analytics/performance/history")
+async def get_performance_history(
+    days: int = Query(365, le=3650, description="Number of days of history"),
+    db: DatabaseManager = Depends(get_db)
+):
+    """
+    Get historical portfolio performance data for charting.
+
+    Returns time-series data of portfolio value, gains, and cumulative returns.
+    """
+    try:
+        from datetime import datetime, timedelta
+
+        cutoff_date = (datetime.now() - timedelta(days=days)).isoformat()
+
+        # Get snapshots
+        history = db.get_portfolio_history(days)
+
+        if len(history) < 2:
+            return {
+                "error": "Insufficient data",
+                "message": f"Need at least 2 snapshots, found {len(history)}"
+            }
+
+        # Calculate cumulative returns from first snapshot
+        first_value = history[0][1]  # (timestamp, total_value)
+
+        data_points = []
+        for timestamp, total_value in history:
+            cumulative_return = ((total_value - first_value) / first_value * 100) if first_value > 0 else 0
+            data_points.append({
+                "timestamp": timestamp,
+                "total_value": total_value,
+                "cumulative_return_percent": cumulative_return
+            })
+
+        return {
+            "period_days": days,
+            "data_points": len(data_points),
+            "start_value": first_value,
+            "end_value": history[-1][1],
+            "total_return_percent": data_points[-1]["cumulative_return_percent"],
+            "history": data_points
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get performance history: {str(e)}")
+
+
 @app.get("/api/v1/analytics/performance/holding/{ticker}")
 async def get_holding_performance(
     ticker: str,
