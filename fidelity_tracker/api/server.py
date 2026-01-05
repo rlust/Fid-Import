@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import tempfile
 import os
@@ -962,6 +962,73 @@ async def get_rebalancing_recommendations(
         return optimizer.get_rebalancing_recommendations(days=days, min_holdings=min_holdings)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get recommendations: {str(e)}")
+
+
+# Sync/Update endpoints
+@app.get("/api/v1/sync/status")
+async def get_sync_status(db: DatabaseManager = Depends(get_db)):
+    """Get sync schedule and status information"""
+    try:
+        from datetime import datetime, time as datetime_time
+        import subprocess
+
+        # Get latest snapshot to determine last sync
+        latest = db.get_latest_snapshot()
+        last_sync = latest['timestamp'] if latest else None
+
+        # Calculate next scheduled sync (6 PM daily)
+        now = datetime.now()
+        next_sync_time = datetime.combine(now.date(), datetime_time(18, 0))
+        if now.time() >= datetime_time(18, 0):
+            # If it's after 6 PM today, next sync is tomorrow at 6 PM
+            next_sync_time = datetime.combine(now.date() + timedelta(days=1), datetime_time(18, 0))
+
+        # Check launchd agent status
+        try:
+            result = subprocess.run(
+                ['launchctl', 'list', 'com.portfolio.sync'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            agent_running = result.returncode == 0
+        except:
+            agent_running = False
+
+        return {
+            "last_sync": last_sync,
+            "next_scheduled_sync": next_sync_time.isoformat(),
+            "schedule": "Daily at 6:00 PM",
+            "agent_active": agent_running,
+            "sync_command": "portfolio-tracker sync"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get sync status: {str(e)}")
+
+
+@app.post("/api/v1/sync/trigger")
+async def trigger_manual_sync():
+    """Manually trigger a portfolio sync"""
+    try:
+        import subprocess
+        from datetime import datetime
+
+        # Run sync command in background
+        result = subprocess.Popen(
+            ['python3', '-m', 'fidelity_tracker.cli.commands', 'sync'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd='/Users/randylust/grok'
+        )
+
+        return {
+            "status": "started",
+            "message": "Portfolio sync initiated",
+            "started_at": datetime.now().isoformat(),
+            "note": "Sync is running in background. Check /api/v1/sync/status for latest data."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to trigger sync: {str(e)}")
 
 
 # Error handlers

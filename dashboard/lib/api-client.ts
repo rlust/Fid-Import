@@ -269,6 +269,16 @@ export const optimizeAPI = {
     fetchAPI(`/api/v1/optimize/rebalance?days=${days}&min_holdings=${minHoldings}`),
 };
 
+// Sync API
+export const syncAPI = {
+  getStatus: (): Promise<any> => fetchAPI('/api/v1/sync/status'),
+
+  triggerManualSync: (): Promise<any> =>
+    fetchAPI('/api/v1/sync/trigger', {
+      method: 'POST',
+    }),
+};
+
 // Health check
 export const healthAPI = {
   check: (): Promise<any> => fetchAPI('/health'),
