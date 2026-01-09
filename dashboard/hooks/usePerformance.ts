@@ -53,3 +53,11 @@ export function usePerformanceHistory(days: number = 365) {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+export function useBenchmarkComparison(days: number = 365, benchmark: string = '^GSPC') {
+  return useQuery({
+    queryKey: ['benchmark-comparison', days, benchmark],
+    queryFn: () => analyticsAPI.getBenchmarkComparison(days, benchmark),
+    staleTime: 5 * 60 * 1000,
+  });
+}

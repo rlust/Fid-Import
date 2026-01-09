@@ -207,6 +207,9 @@ export const analyticsAPI = {
   getPerformanceHistory: (days: number = 365): Promise<any> =>
     fetchAPI(`/api/v1/analytics/performance/history?days=${days}`),
 
+  getBenchmarkComparison: (days: number = 365, benchmark: string = '^GSPC'): Promise<any> =>
+    fetchAPI(`/api/v1/analytics/performance/benchmark-comparison?days=${days}&benchmark=${benchmark}`),
+
   getHoldingPerformance: (ticker: string, days: number = 365): Promise<any> =>
     fetchAPI(`/api/v1/analytics/performance/holding/${ticker}?days=${days}`),
 

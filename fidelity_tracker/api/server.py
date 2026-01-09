@@ -752,6 +752,98 @@ async def get_performance_history(
         raise HTTPException(status_code=500, detail=f"Failed to get performance history: {str(e)}")
 
 
+@app.get("/api/v1/analytics/performance/benchmark-comparison")
+async def get_benchmark_comparison(
+    days: int = Query(365, le=3650, description="Number of days of history"),
+    benchmark: str = Query("^GSPC", description="Benchmark ticker (default: S&P 500)"),
+    db: DatabaseManager = Depends(get_db),
+    fetcher: BenchmarkFetcher = Depends(get_benchmark_fetcher)
+):
+    """
+    Get portfolio vs benchmark comparison data for charting.
+
+    Returns normalized performance comparison starting from 100.
+    """
+    try:
+        from datetime import datetime, timedelta
+
+        # Get portfolio history
+        portfolio_history = db.get_portfolio_history(days)
+
+        if len(portfolio_history) < 2:
+            return {
+                "error": "Insufficient portfolio data",
+                "message": f"Need at least 2 snapshots, found {len(portfolio_history)}"
+            }
+
+        # Get benchmark data
+        start_date = portfolio_history[0][0]  # First timestamp
+        end_date = portfolio_history[-1][0]  # Last timestamp
+
+        try:
+            benchmark_data = fetcher.get_benchmark_history(
+                ticker=benchmark,
+                start_date=start_date,
+                end_date=end_date
+            )
+        except:
+            # If no benchmark data, return portfolio only
+            benchmark_data = []
+
+        # Normalize both to start at 100
+        portfolio_start_value = portfolio_history[0][1]
+        portfolio_normalized = [
+            {
+                "timestamp": timestamp,
+                "portfolio_value": (value / portfolio_start_value) * 100,
+                "portfolio_return_percent": ((value - portfolio_start_value) / portfolio_start_value) * 100
+            }
+            for timestamp, value in portfolio_history
+        ]
+
+        # Add benchmark data if available
+        if benchmark_data:
+            benchmark_start_price = benchmark_data[0]['close_price']
+
+            # Create a map of dates to benchmark prices for alignment
+            benchmark_map = {
+                data['date']: (data['close_price'] / benchmark_start_price) * 100
+                for data in benchmark_data
+            }
+
+            # Align benchmark with portfolio timestamps
+            for point in portfolio_normalized:
+                # Try to find matching benchmark data
+                point_date = point['timestamp'].split('T')[0]  # Extract date part
+                if point_date in benchmark_map:
+                    point['benchmark_value'] = benchmark_map[point_date]
+                    point['benchmark_return_percent'] = benchmark_map[point_date] - 100
+
+        # Calculate summary metrics
+        portfolio_return = portfolio_normalized[-1]['portfolio_return_percent']
+        benchmark_return = portfolio_normalized[-1].get('benchmark_return_percent', 0)
+        alpha = portfolio_return - benchmark_return
+
+        return {
+            "period_days": days,
+            "data_points": len(portfolio_normalized),
+            "start_date": portfolio_history[0][0],
+            "end_date": portfolio_history[-1][0],
+            "benchmark_ticker": benchmark,
+            "benchmark_available": len(benchmark_data) > 0,
+            "summary": {
+                "portfolio_return": portfolio_return,
+                "benchmark_return": benchmark_return,
+                "alpha": alpha,
+                "outperforming": portfolio_return > benchmark_return
+            },
+            "history": portfolio_normalized
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get benchmark comparison: {str(e)}")
+
+
 @app.get("/api/v1/analytics/performance/holding/{ticker}")
 async def get_holding_performance(
     ticker: str,

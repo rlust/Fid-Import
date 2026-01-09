@@ -4,11 +4,12 @@ This document explains the automated startup configuration for the Portfolio Tra
 
 ## Overview
 
-Three launchd agents have been configured to maintain system functionality:
+Four launchd agents have been configured to maintain system functionality:
 
 1. **Backend API** - FastAPI server on port 8000
 2. **Frontend Dashboard** - Next.js app on port 3000
 3. **Daily Sync** - Automated portfolio synchronization
+4. **Transaction Inference** - Automated transaction detection from snapshots
 
 ## LaunchAgent Files
 
@@ -34,6 +35,13 @@ Located in `~/Library/LaunchAgents/`:
 - **Schedule**: Daily at 6:00 PM
 - **Command**: `portfolio-tracker sync`
 - **Logs**: `~/grok/logs/sync.log` and `sync.error.log`
+
+### 4. Transaction Inference (`com.portfolio.infer.plist`)
+- **Service**: Automatic transaction detection from snapshot changes
+- **Schedule**: Daily at 6:15 PM (15 minutes after sync)
+- **Command**: `curl -X POST http://localhost:8000/api/v1/transactions/infer?save=true&skip_existing=true`
+- **Logs**: `~/grok/logs/infer.log` and `infer.error.log`
+- **Purpose**: Automatically creates transaction records when holdings change between snapshots
 
 ## Management Commands
 
