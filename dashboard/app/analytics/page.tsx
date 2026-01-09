@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useComprehensiveRisk } from '@/hooks/useRisk';
-import { usePerformance, useTopContributors, useSectorAttribution, usePerformanceHistory } from '@/hooks/usePerformance';
+import { usePerformance, useTopContributors, useSectorAttribution, usePerformanceHistory, useBenchmarkComparison } from '@/hooks/usePerformance';
 import { useSectorAllocation } from '@/hooks/usePortfolio';
 import { PeriodSelector } from '@/components/shared/PeriodSelector';
 import { MetricCard } from '@/components/shared/MetricCard';
@@ -10,10 +10,11 @@ import { SectorPieChart } from '@/components/visualizations/SectorPieChart';
 import { CorrelationHeatmap } from '@/components/visualizations/CorrelationHeatmap';
 import { InteractivePerformanceChart } from '@/components/visualizations/InteractivePerformanceChart';
 import { formatPercent, formatCurrency } from '@/lib/formatters';
-import { TrendingUp, Target, Shield, AlertTriangle, PieChart as PieChartIcon, Download } from 'lucide-react';
+import { TrendingUp, Target, Shield, AlertTriangle, PieChart as PieChartIcon, Download, BarChart3 } from 'lucide-react';
 
 export default function AnalyticsPage() {
   const [days, setDays] = useState(365);
+  const [showBenchmark, setShowBenchmark] = useState(true);
 
   const { data: riskData, isLoading: riskLoading } = useComprehensiveRisk(days);
   const { data: performance, isLoading: perfLoading } = usePerformance(days);
@@ -21,6 +22,7 @@ export default function AnalyticsPage() {
   const { data: sectorAttribution, isLoading: sectorLoading } = useSectorAttribution(Math.min(days, 30));
   const { data: sectors, isLoading: sectorsLoading } = useSectorAllocation();
   const { data: performanceHistory, isLoading: historyLoading } = usePerformanceHistory(days);
+  const { data: benchmarkComparison, isLoading: benchmarkLoading } = useBenchmarkComparison(days);
 
   // Transform sectors for pie chart
   const sectorPieData = sectors?.map((sector) => ({
@@ -29,8 +31,13 @@ export default function AnalyticsPage() {
     percentage: sector.percentage || 0,
   })) || [];
 
-  // Transform performance history for chart
-  const chartData = performanceHistory?.history?.map((point: any) => ({
+  // Transform performance history for chart with optional benchmark
+  const chartData = benchmarkComparison?.history?.map((point: any) => ({
+    date: point.timestamp,
+    value: point.portfolio_value, // Normalized to 100
+    benchmark: showBenchmark && point.benchmark_value ? point.benchmark_value : undefined,
+    return: point.portfolio_return_percent,
+  })) || performanceHistory?.history?.map((point: any) => ({
     date: point.timestamp,
     value: point.total_value,
     return: point.cumulative_return_percent,
@@ -199,14 +206,72 @@ export default function AnalyticsPage() {
         )}
       </div>
 
+      {/* Benchmark Comparison Metrics */}
+      {benchmarkComparison?.summary && benchmarkComparison.benchmark_available && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <BarChart3 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Portfolio vs S&P 500
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Portfolio Return</div>
+              <div className={`text-2xl font-bold ${benchmarkComparison.summary.portfolio_return >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {benchmarkComparison.summary.portfolio_return >= 0 ? '+' : ''}
+                {formatPercent(benchmarkComparison.summary.portfolio_return)}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">S&P 500 Return</div>
+              <div className={`text-2xl font-bold ${benchmarkComparison.summary.benchmark_return >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {benchmarkComparison.summary.benchmark_return >= 0 ? '+' : ''}
+                {formatPercent(benchmarkComparison.summary.benchmark_return)}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                Alpha {benchmarkComparison.summary.outperforming ? '(Outperforming)' : '(Underperforming)'}
+              </div>
+              <div className={`text-2xl font-bold ${benchmarkComparison.summary.alpha >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {benchmarkComparison.summary.alpha >= 0 ? '+' : ''}
+                {formatPercent(benchmarkComparison.summary.alpha)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Portfolio Performance History */}
       {!historyLoading && chartData.length > 0 && (
-        <InteractivePerformanceChart
-          data={chartData}
-          title="Portfolio Value Over Time"
-          showReturns={true}
-          height={450}
-        />
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Performance Chart ({days} days)
+            </h3>
+            {benchmarkComparison?.benchmark_available && (
+              <button
+                onClick={() => setShowBenchmark(!showBenchmark)}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                  showBenchmark
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span>{showBenchmark ? 'Hide' : 'Show'} S&P 500</span>
+              </button>
+            )}
+          </div>
+          <InteractivePerformanceChart
+            data={chartData}
+            title=""
+            showBenchmark={showBenchmark && benchmarkComparison?.benchmark_available}
+            showReturns={false}
+            height={450}
+          />
+        </div>
       )}
 
       {/* Sector Allocation */}

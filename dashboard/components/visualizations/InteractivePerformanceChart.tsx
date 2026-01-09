@@ -40,6 +40,9 @@ export function InteractivePerformanceChart({
   const [brushStartIndex, setBrushStartIndex] = useState<number | undefined>(undefined);
   const [brushEndIndex, setBrushEndIndex] = useState<number | undefined>(undefined);
 
+  // Detect if data is normalized (benchmark comparison mode)
+  const isNormalized = data.length > 0 && data[0].value < 1000;
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null;
 
@@ -54,6 +57,8 @@ export function InteractivePerformanceChart({
             <span className="text-sm font-medium" style={{ color: entry.color }}>
               {entry.dataKey === 'return'
                 ? formatPercent(entry.value)
+                : isNormalized
+                ? `${entry.value.toFixed(2)}`
                 : formatCurrency(entry.value)}
             </span>
           </div>
@@ -99,7 +104,9 @@ export function InteractivePerformanceChart({
 
           <YAxis
             yAxisId="left"
-            tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+            tickFormatter={(value) =>
+              isNormalized ? value.toFixed(0) : `$${(value / 1000).toFixed(0)}k`
+            }
             stroke="#6b7280"
             style={{ fontSize: '12px' }}
           />
@@ -130,7 +137,7 @@ export function InteractivePerformanceChart({
             stroke="#3b82f6"
             strokeWidth={2}
             dot={false}
-            name="Portfolio Value"
+            name={isNormalized ? "Portfolio" : "Portfolio Value"}
             activeDot={{ r: 6 }}
           />
 
